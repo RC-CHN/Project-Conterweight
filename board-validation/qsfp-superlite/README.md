@@ -83,7 +83,33 @@ external-path claims remain unverified.  The previous clock smoke test measured
 Y5 at approximately 644.530 MHz, consistent with the nominal 644.53125 MHz
 source used by the recovered fPLL configuration.
 
-Next, add a management image that exposes `modprsl` and safe retimer readback,
-then build a small four-lane internal-loopback image.  Build reports, artifact
-hashes, exact status/error counters and hardware observations will be recorded
-in `RESULTS.md` after each stage runs.
+The management image and its local result are now complete.  The next design
+stage is a small four-lane internal-loopback image.  Build reports, artifact
+hashes, exact status/error counters and hardware observations are recorded in
+`RESULTS.md` after each stage runs.
+
+## Management image
+
+Regenerate and compile the management-only image with Quartus 22.1:
+
+```bash
+./regenerate_mgmt.sh
+quartus_sh --flow compile qsfp_mgmt
+```
+
+After reviewing the reports, load only the SOF into SRAM and run the read-only
+inspection:
+
+```bash
+quartus_pgm -c 1 -m jtag -o 'p;output_files/qsfp_mgmt.sof'
+
+/workspace/intelFPGA/22.1std/quartus/sopc_builder/bin/system-console \
+  --project_dir=. \
+  --jdi=output_files/qsfp_mgmt.jdi \
+  --script=inspect_mgmt.tcl
+```
+
+`set_retimer_103125.tcl` is a separate, guarded operation.  It first repeats
+the complete read-only inspection and refuses to write unless `MODPRSL=1`
+(module absent).  It then performs only the documented volatile broadcast/rate
+sequence and verifies readback.  See `RESULTS.md` for the accepted local run.

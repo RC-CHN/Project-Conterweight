@@ -21,7 +21,7 @@
 | JTAG TCK | 插件报告 `15M` |
 | 配置 Flash | Quartus 识别为 `MT25QU01G`，Examine silicon ID `0x21` |
 | 当前 Flash 上电设计 | `pcie-temp-demo` |
-| 当前 SRAM 设计 | `board-validation/ddr4-dual`（双 DDR4 控制器验证；断电后仍回到 Flash 设计） |
+| 当前 SRAM 设计 | `board-validation/qsfp-superlite` 的 `qsfp_mgmt`（QSFP 管理面；断电后仍回到 Flash 设计） |
 | 当前主 PCIe 端点 | `1172:e003`，最近枚举地址 `0000:6a:00.0` |
 
 ## 本地已验证
@@ -61,7 +61,21 @@
 - 扫描不写目标数据；定向 ID 脚本只选择只读指针/命令，没有写目标配置值。最终两路均为空闲高，FPGA OE 为 0。
 - 详细构建、地址证据、Intel `BUS_HOLD` 根因和一次开漏恢复记录见 [board-validation/i2c/RESULTS.md](board-validation/i2c/RESULTS.md)。
 
-本次没有发现常见地址 `0x50` 的 QSFP EEPROM，说明当前模块/线缆管理面尚不能标记为本地通过；retimer 的速率、通道和 CDR 寄存器也没有在 I2C 基础验证阶段改动。
+基础 I2C 扫描没有发现常见地址 `0x50` 的 QSFP EEPROM。后续专用 QSFP 管理镜像已确认这是因为当前没有安装模块/线缆，而不是仅凭 NACK 猜测；见下一节。
+
+### QSFP 管理面和 retimer 易失性速率配置
+
+- `board-validation/qsfp-superlite` 的管理镜像只连接 U59、Y5、`MODPRSL` 和 I2C channel 1，不实例化 transceiver，也不驱动 QSFP 高速 TX lane。
+- Quartus 22.1 完整编译 0 errors、9 warnings；setup/hold 完全约束且所有 TNS 为 0。最差 setup 为 `+0.624 ns`，最差 hold 为 `+0.016 ns`。
+- SOF SHA-256 为 `c78b7beb8e9e6f42aa7e779e7a745e4b700461283a3789998e7d628f95d89338`；SRAM 配置 0 errors、0 warnings，配置后 JTAG 仍识别 `0x02E060DD`。
+- `MODPRSL=1` 明确报告当前没有 QSFP 模块/线缆；`0x50` 同时 NACK，因此 EEPROM 字段属于未具备测试条件，不标失败。
+- 三次 Y5 测量约为 `644.528 MHz`，与标称 644.53125 MHz 一致。
+- DS250DF810 在 `0x22` 稳定 ACK；配置前读到 `0xff=0x21`、`0x2f=0x54`。
+- 在“模块不存在”的脚本门禁下，已执行社区明确记录的易失性广播速率序列：写 `0xff=0x03`，再保留 `0x2f` 低半字节并将高半字节清零；写后及独立复查均为 `0xff=0x03`、`0x2f=0x04`，对应 10.3125 Gbit/s quick-rate 选择。
+- 所有事务前后 SCL/SDA 都为空闲高，FPGA OE 均为 0；QSPI Flash 未触碰。
+- 完整证据和 warning 审核见 [board-validation/qsfp-superlite/RESULTS.md](board-validation/qsfp-superlite/RESULTS.md)。
+
+这一步证明了参考时钟、presence 输入、管理 I2C、retimer 寄存器访问和已知的速率快速配置序列；还没有证明 FPGA 收发器、retimer 数据通路、cage 接点或外部模块/线缆。
 
 ### 两组 DDR4
 
@@ -117,16 +131,15 @@
 
 ### 2. QSFP+、retimer 和高速收发器
 
-计划建立 `board-validation/qsfp-superlite/`：
+`board-validation/qsfp-superlite/` 的管理阶段已经完成；下一阶段：
 
-- 先通过 I2C 验证 QSFP presence、EEPROM 和 `DS250DF810` 管理面。
-- 确认模块、电缆和散热条件后，再解除高速 TX reset/mute。
-- 以每 lane `10.3125 Gbit/s` 为第一目标；retimer 社区配置为广播通道后设置相应速率。
+- 使用 Arria 10 Native PHY 的逐 lane 内部串行回环，以每 lane `10.3125 Gbit/s` 验证 FPGA 内部 TX PLL、PMA/CDR、PCS 和误码计数；该模式不经过 retimer/cage。
 - 先验证 TX PLL lock、RX CDR lock、lane lock、deskew、PRBS/error counter 和温度。
+- 当前无模块，QSFP EEPROM 需安装兼容模块或 DAC 后再验证。
 - 如果有合适的 QSFP 环回头或另一端设备，再验证完整的 4-lane 外部路径。
 - SuperLite II 是链路测试协议，不等同于 Ethernet、InfiniBand 或 FPGA 到 ConnectX-4 的通信。
 
-验收条件分两级：管理面和内部收发器状态可以单卡完成；QSFP cage 的完整外部收发路径必须有环回头、线缆加第二端或合适的网络设备。
+验收条件分两级：管理面已经单卡通过，内部收发器状态仍待单卡回环实测；QSFP cage 的完整外部收发路径必须有环回头、线缆加第二端或合适的网络设备。
 
 ## 暂时不好验证
 

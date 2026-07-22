@@ -1,0 +1,12 @@
+**/db/
+**/incremental_db/
+**/output_files/
+**/*.log
+**/*.rpt
+**/*.summary
+**/*.smsg
+**/*.qws
+**/*.sopcinfo
+
+# Platform Designer generated HDL. Recreate it from the tracked .qsys and Tcl.
+**/i2c_bridge/

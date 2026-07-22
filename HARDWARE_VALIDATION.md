@@ -21,7 +21,7 @@
 | JTAG TCK | 插件报告 `15M` |
 | 配置 Flash | Quartus 识别为 `MT25QU01G`，Examine silicon ID `0x21` |
 | 当前 Flash 上电设计 | `pcie-temp-demo` |
-| 当前 SRAM 设计 | `board-validation/i2c`（后续验证会继续替换） |
+| 当前 SRAM 设计 | `board-validation/ddr4-dual`（双 DDR4 控制器验证；断电后仍回到 Flash 设计） |
 | 当前主 PCIe 端点 | `1172:e003`，最近枚举地址 `0000:6a:00.0` |
 
 ## 本地已验证
@@ -63,6 +63,18 @@
 
 本次没有发现常见地址 `0x50` 的 QSFP EEPROM，说明当前模块/线缆管理面尚不能标记为本地通过；retimer 的速率、通道和 CDR 寄存器也没有在 I2C 基础验证阶段改动。
 
+### 两组 DDR4
+
+- `board-validation/ddr4-dual` 同时实例化了两套相互独立的 72-bit EMIF（64-bit 数据 + 8-bit ECC），使用 DDR4-1600 参数：800 MHz 存储器时钟、200 MHz quarter-rate 用户时钟和两路 266.667 MHz 板载参考时钟。
+- 工程已用 Quartus 22.1 对 `10AXF40AA` 完整编译，0 errors、31 warnings；最终 SOF SHA-256 为 `45db8d72aac1e96ff52833c62091419ec73781527f19f1a6db219ccb73cbb6e7`。
+- 四个时序角的 setup、hold、recovery、removal 和 minimum pulse-width slack 均为正；最差 setup 为 `+0.657 ns`，最差 hold 为 `+0.012 ns`，最差 recovery 为 `+0.259 ns`，最差 removal 为 `+0.158 ns`，最差 pulse-width 为 `+0.300 ns`。
+- 最终 SOF 已写入 SRAM，Quartus Programmer 报告 0 errors、0 warnings；配置前后 JTAG 均稳定识别 `0x02E060DD`。
+- 两个控制器均报告 `pll_locked=1`、`cal_success=1`、`cal_fail=0`，各自的 200 MHz 用户域 heartbeat 持续变化。
+- 两个独立的 2 GiB Avalon 窗口都在 `0x00000000` 至 `0x7fffffc0` 间抽样了 7 个分散地址；每处完成一条 64-byte 数据的写入、读回和比较，两边全部通过，ECC interrupt 始终为 0。
+- 详细的构建、warning 审核、时序例外边界、System Console 测试和限制见 [board-validation/ddr4-dual/RESULTS.md](board-validation/ddr4-dual/RESULTS.md)。
+
+当前结论是双控制器的本地基础功能已通过，不是整卡 DDR4 容量认证：显式 JTAG-Avalon master 每侧只暴露 2 GiB，本轮没有遍历全部物理容量，也没有做两个通道同时满速的长时间压力测试。下一阶段应在 FPGA 内加入全数据宽度 BIST/traffic generator、错误计数和温度遥测，再做容量边界及并发压力验证。
+
 ### SFL 和 QSPI Flash
 
 - 自定义 SFL bridge 已在当前卡上完成 SRAM 加载和 Flash 访问验证。
@@ -90,17 +102,15 @@
 
 新工程计划放入独立的 `board-validation/` 目录，各子项目保留源文件、约束和验证记录，不提交 `db/`、`incremental_db/`、日志或大型编程文件。
 
-### 1. 两组 DDR4
+### 1. DDR4 全容量和并发压力
 
-计划分别建立 `board-validation/ddr4-top/` 和 `board-validation/ddr4-bottom/`，最后再考虑双通道工程：
+双控制器基础读写已经通过，下一步计划在现有 `board-validation/ddr4-dual` 基础上增加：
 
-- 使用社区已验证的 72-bit 引脚和现有 EMIF 参数作为依据，在 Quartus 22.1 中重新生成 IP。
-- 先单独验证每组 EMIF 的 PLL lock、local calibration success/fail 和 EMIF Toolkit 可见性。
-- 校准通过后运行地址线、数据线、walking-bit、固定模式、伪随机模式和大范围读写测试。
-- 分别记录 64-bit 数据和 8-bit ECC/附加字节通道的结果，避免只测试低位数据。
-- 单通道通过后再做双通道并行压力测试，并持续读取 FPGA 温度。
+- 两侧独立、可并发运行的 FPGA 内部全数据宽度 traffic generator/BIST，覆盖 walking-bit、固定模式、伪随机和地址相关模式。
+- 明确探测并记录每组实际可寻址容量，不以当前 2 GiB JTAG-Avalon 调试窗口代替物理容量结论。
+- 持续错误计数、ECC 状态、吞吐量和温度遥测，进行双通道同时满载的长时间测试。
 
-验收条件：两组 EMIF 分别校准成功；可用地址范围和容量有本地证据；长时间内存测试错误计数为 0；对应时钟和 EMIF 时序报告完成检查。
+验收条件：两组容量边界有本地证据；全宽模式测试和双通道长时间并发压力错误计数均为 0；持续负载下温度和供电稳定。
 
 ### 2. QSFP+、retimer 和高速收发器
 
@@ -135,7 +145,7 @@
 1. 每次实验前检查 JTAG ID、USB 状态、气流和当前温度。
 2. 所有工程使用 Quartus 22.1 和 `10AXF40AA` 从源文件重新编译。
 3. 先完成 LED、时钟和输入采样，再扫描 I2C。
-4. DDR4 两个通道分别验证，避免同时引入两个高风险接口。
+4. DDR4 双控制器基础读写已通过；后续使用片上 BIST 分别确认容量边界，再做双通道并发压力和温度测试。
 5. QSFP 先管理面、再低风险内部状态，最后才启用外部高速发送。
 6. 新设计先写 SRAM；写入前不保留 PCIe BAR `mmap`，写入后重新检查 JTAG。
 7. 每个构建记录错误、critical warning、时序结果、SOF SHA-256、JTAG ID、温度和硬件现象。

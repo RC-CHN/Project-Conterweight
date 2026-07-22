@@ -4,9 +4,12 @@
 **/*.log
 **/*.rpt
 **/*.summary
+**/*_summary.csv
 **/*.smsg
 **/*.qws
 **/*.sopcinfo
+**/*_assignment_defaults.qdf
+**/Qsys/
 
 # Platform Designer generated HDL. Recreate it from the tracked .qsys and Tcl.
 **/i2c_bridge/

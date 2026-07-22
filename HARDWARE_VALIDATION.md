@@ -63,7 +63,7 @@
 
 基础 I2C 扫描没有发现常见地址 `0x50` 的 QSFP EEPROM。后续专用 QSFP 管理镜像已确认这是因为当前没有安装模块/线缆，而不是仅凭 NACK 猜测；见下一节。
 
-### QSFP 管理面和 retimer 易失性速率配置
+### QSFP 管理面、retimer 配置和 FPGA 内部高速回环
 
 - `board-validation/qsfp-superlite` 的管理镜像只连接 U59、Y5、`MODPRSL` 和 I2C channel 1，不实例化 transceiver，也不驱动 QSFP 高速 TX lane。
 - Quartus 22.1 完整编译 0 errors、9 warnings；setup/hold 完全约束且所有 TNS 为 0。最差 setup 为 `+0.624 ns`，最差 hold 为 `+0.016 ns`。
@@ -73,9 +73,16 @@
 - DS250DF810 在 `0x22` 稳定 ACK；配置前读到 `0xff=0x21`、`0x2f=0x54`。
 - 在“模块不存在”的脚本门禁下，已执行社区明确记录的易失性广播速率序列：写 `0xff=0x03`，再保留 `0x2f` 低半字节并将高半字节清零；写后及独立复查均为 `0xff=0x03`、`0x2f=0x04`，对应 10.3125 Gbit/s quick-rate 选择。
 - 所有事务前后 SCL/SDA 都为空闲高，FPGA OE 均为 0；QSPI Flash 未触碰。
+- 四通道内部回环镜像使用 Y5 驱动 transceiver-mode fPLL；5.15625 GHz MCGB 时钟驱动四条 non-bonded TX lane，每条物理线速率为 `10.3125 Gbit/s`，四路 RX CDR 直接使用 Y5。
+- Quartus 22.1 对内部回环镜像完整编译为 0 errors、9 warnings，Fitter 选择 `10AXF40AA`；setup/hold 完全约束，零未约束时钟/端口/输入输出路径，所有 timing corner 的 setup、hold、recovery、removal 和 pulse-width slack 均为正。
+- 内部回环 SOF SHA-256 为 `5e2e58ded09831fc50b92d9e9822e1652cb0bdefabdd498e7aaec554729b966e`；仅写入 SRAM，Programmer 0 errors、0 warnings，配置前后 JTAG 均识别 `0x02E060DD`。
+- 新镜像配置后、任何控制写入前的只读检查确认 `source=0x00`、`safe_enable=0`，证明硬件上电默认状态不会启用高速发送路径。
+- fPLL lock、四路 TX/RX ready、四路 CDR lock-to-data/ref、四路 PCS block lock 和 checker 均通过，TX/RX calibration busy、FIFO full/partial-full/overflow 均为 0。
+- lane 0..3 的独立注错逐条通过；清零后 60 秒 soak 每路处理约 93.86 亿个 66-bit block，四路 error count 和 lock-loss count 均保持 0，结束温度为 `52.40 C`。
+- 测试清理路径最终确认 `source=0x00`、`safe_enable=0`；当前 SRAM 高速路径关闭，QSPI Flash 未触碰。
 - 完整证据和 warning 审核见 [board-validation/qsfp-superlite/RESULTS.md](board-validation/qsfp-superlite/RESULTS.md)。
 
-这一步证明了参考时钟、presence 输入、管理 I2C、retimer 寄存器访问和已知的速率快速配置序列；还没有证明 FPGA 收发器、retimer 数据通路、cage 接点或外部模块/线缆。
+这两步证明了参考时钟、presence 输入、管理 I2C、retimer 寄存器访问、已知的速率快速配置序列，以及 FPGA 内部四路 TX PCS/PMA、串行回环、RX PMA/CDR/PCS 数字路径。内部串行回环不经过 retimer、cage、模块或线缆，因此仍没有证明外部高速通路。
 
 ### 两组 DDR4
 
@@ -131,15 +138,14 @@
 
 ### 2. QSFP+、retimer 和高速收发器
 
-`board-validation/qsfp-superlite/` 的管理阶段已经完成；下一阶段：
+`board-validation/qsfp-superlite/` 的管理面和 FPGA 内部高速回环均已完成；下一阶段需要外部端点：
 
-- 使用 Arria 10 Native PHY 的逐 lane 内部串行回环，以每 lane `10.3125 Gbit/s` 验证 FPGA 内部 TX PLL、PMA/CDR、PCS 和误码计数；该模式不经过 retimer/cage。
-- 先验证 TX PLL lock、RX CDR lock、lane lock、deskew、PRBS/error counter 和温度。
 - 当前无模块，QSFP EEPROM 需安装兼容模块或 DAC 后再验证。
 - 如果有合适的 QSFP 环回头或另一端设备，再验证完整的 4-lane 外部路径。
+- 外部测试需继续使用逐 lane error/lock-loss counter，并增加足够长的 BER soak；多 lane 协议对齐/deskew 只能在实际外部协议或 SuperLite 对端上验证，不能由四条相互独立的内部回环代替。
 - SuperLite II 是链路测试协议，不等同于 Ethernet、InfiniBand 或 FPGA 到 ConnectX-4 的通信。
 
-验收条件分两级：管理面已经单卡通过，内部收发器状态仍待单卡回环实测；QSFP cage 的完整外部收发路径必须有环回头、线缆加第二端或合适的网络设备。
+验收条件分三级：管理面和 FPGA 内部收发器已单卡通过；QSFP cage 的完整外部收发路径必须有环回头、线缆加第二端或合适的网络设备；协议互通还要使用对应 Ethernet、InfiniBand 或 SuperLite 端点单独验收。
 
 ## 暂时不好验证
 
@@ -162,7 +168,7 @@
 2. 所有工程使用 Quartus 22.1 和 `10AXF40AA` 从源文件重新编译。
 3. 先完成 LED、时钟和输入采样，再扫描 I2C。
 4. DDR4 双控制器 2 GiB/通道的全地址并发 BIST 已通过；后续做峰值带宽、长时间压力、温度遥测和更高速率实验。
-5. QSFP 先管理面、再低风险内部状态，最后才启用外部高速发送。
+5. QSFP 管理面和低风险内部回环已通过；下一步只有具备合适端点时才验证外部高速路径。
 6. 新设计先写 SRAM；写入前不保留 PCIe BAR `mmap`，写入后重新检查 JTAG。
 7. 每个构建记录错误、critical warning、时序结果、SOF SHA-256、JTAG ID、温度和硬件现象。
 8. 第二组 PCIe x8 不实例化、不训练；未知或未使用引脚保持输入/三态。

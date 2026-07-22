@@ -1,0 +1,85 @@
+# Catapult v3 four-lane 10.3125 Gbit/s FPGA-internal serial loopback.
+# Unknown board pins remain input/tri-stated.  QSPI is not accessed.
+
+set_global_assignment -name FAMILY "Arria 10"
+set_global_assignment -name DEVICE 10AXF40AA
+set_global_assignment -name TOP_LEVEL_ENTITY qsfp_internal_loopback
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files_loopback
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 16
+set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
+set_global_assignment -name MAX_CORE_JUNCTION_TEMP 100
+set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 2
+set_global_assignment -name AUTO_RESERVE_CLKUSR_FOR_CALIBRATION OFF
+set_global_assignment -name PRESERVE_UNUSED_XCVR_CHANNEL ON
+set_global_assignment -name ENABLE_OCT_DONE OFF
+set_global_assignment -name STRATIXV_CONFIGURATION_SCHEME "ACTIVE SERIAL X4"
+set_global_assignment -name USE_CONFIGURATION_DEVICE ON
+set_global_assignment -name CRC_ERROR_OPEN_DRAIN ON
+set_global_assignment -name RESERVE_DATA0_AFTER_CONFIGURATION "USE AS REGULAR IO"
+set_global_assignment -name ACTIVE_SERIAL_CLOCK FREQ_100MHZ
+set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
+set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-STATED"
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+
+set_global_assignment -name SYSTEMVERILOG_FILE qsfp_internal_loopback.sv
+set_global_assignment -name QSYS_FILE fpll.qsys
+set_global_assignment -name QSYS_FILE xcvr_superlite_ii.qsys
+set_global_assignment -name QSYS_FILE xcvr_reset_controller.qsys
+set_global_assignment -name VERILOG_FILE /workspace/intelFPGA/22.1std/ip/altera/altera_temp_sense/altera_temp_sense.v
+set_global_assignment -name SDC_FILE qsfp_internal_loopback.sdc
+
+# 100 MHz management clock U59.
+set_location_assignment PIN_AP20 -to clk_u59
+set_instance_assignment -name IO_STANDARD "1.8 V" -to clk_u59
+
+# 644.53125 MHz QSFP oscillator Y5.
+set_location_assignment PIN_U29 -to clk_y5
+set_location_assignment PIN_U28 -to "clk_y5(n)"
+set_instance_assignment -name IO_STANDARD LVDS -to clk_y5
+set_instance_assignment -name IO_STANDARD LVDS -to "clk_y5(n)"
+
+# Active-low module-present input.  It is never driven by the FPGA.
+set_location_assignment PIN_AG15 -to modprsl
+set_instance_assignment -name IO_STANDARD "1.8 V" -to modprsl
+
+# Four QSFP receive lanes.  Internal PMA serial loopback is enabled, so these
+# pins are placed but their external signal is not the checker data source.
+set_location_assignment PIN_W33 -to qsfp_rx[0]
+set_location_assignment PIN_W32 -to "qsfp_rx[0](n)"
+set_location_assignment PIN_V35 -to qsfp_rx[1]
+set_location_assignment PIN_V34 -to "qsfp_rx[1](n)"
+set_location_assignment PIN_V31 -to qsfp_rx[2]
+set_location_assignment PIN_V30 -to "qsfp_rx[2](n)"
+set_location_assignment PIN_U33 -to qsfp_rx[3]
+set_location_assignment PIN_U32 -to "qsfp_rx[3](n)"
+set_instance_assignment -name IO_STANDARD "HIGH SPEED DIFFERENTIAL I/O" -to qsfp_rx[0]
+set_instance_assignment -name IO_STANDARD "HIGH SPEED DIFFERENTIAL I/O" -to qsfp_rx[1]
+set_instance_assignment -name IO_STANDARD "HIGH SPEED DIFFERENTIAL I/O" -to qsfp_rx[2]
+set_instance_assignment -name IO_STANDARD "HIGH SPEED DIFFERENTIAL I/O" -to qsfp_rx[3]
+set_instance_assignment -name XCVR_VCCR_VCCT_VOLTAGE 1_0V -to qsfp_rx[0]
+set_instance_assignment -name XCVR_VCCR_VCCT_VOLTAGE 1_0V -to qsfp_rx[1]
+set_instance_assignment -name XCVR_VCCR_VCCT_VOLTAGE 1_0V -to qsfp_rx[2]
+set_instance_assignment -name XCVR_VCCR_VCCT_VOLTAGE 1_0V -to qsfp_rx[3]
+
+# Four QSFP transmit lanes.  The no-module hardware gate holds their reset
+# unless synchronized MODPRSL is high.
+set_location_assignment PIN_V39 -to qsfp_tx[0]
+set_location_assignment PIN_V38 -to "qsfp_tx[0](n)"
+set_location_assignment PIN_U37 -to qsfp_tx[1]
+set_location_assignment PIN_U36 -to "qsfp_tx[1](n)"
+set_location_assignment PIN_T39 -to qsfp_tx[2]
+set_location_assignment PIN_T38 -to "qsfp_tx[2](n)"
+set_location_assignment PIN_R37 -to qsfp_tx[3]
+set_location_assignment PIN_R36 -to "qsfp_tx[3](n)"
+set_instance_assignment -name IO_STANDARD "HIGH SPEED DIFFERENTIAL I/O" -to qsfp_tx[0]
+set_instance_assignment -name IO_STANDARD "HIGH SPEED DIFFERENTIAL I/O" -to qsfp_tx[1]
+set_instance_assignment -name IO_STANDARD "HIGH SPEED DIFFERENTIAL I/O" -to qsfp_tx[2]
+set_instance_assignment -name IO_STANDARD "HIGH SPEED DIFFERENTIAL I/O" -to qsfp_tx[3]
+set_instance_assignment -name XCVR_VCCR_VCCT_VOLTAGE 1_0V -to qsfp_tx[0]
+set_instance_assignment -name XCVR_VCCR_VCCT_VOLTAGE 1_0V -to qsfp_tx[1]
+set_instance_assignment -name XCVR_VCCR_VCCT_VOLTAGE 1_0V -to qsfp_tx[2]
+set_instance_assignment -name XCVR_VCCR_VCCT_VOLTAGE 1_0V -to qsfp_tx[3]
+
+set_global_assignment -name LAST_QUARTUS_VERSION "22.1std.0 Standard Edition"

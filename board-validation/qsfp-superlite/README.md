@@ -75,7 +75,7 @@ a remote peer when serial loopback is disabled.
   register `0xff`, then masked rate selection in register `0x2f`.
 - Program SRAM only.  This validation does not touch QSPI Flash.
 
-## Current evidence and remaining work
+## Current evidence
 
 The existing local I2C project has already found stable ACKs from retimer
 address `0x22`.  It did not find `0x50`, so module EEPROM access and all
@@ -83,10 +83,12 @@ external-path claims remain unverified.  The previous clock smoke test measured
 Y5 at approximately 644.530 MHz, consistent with the nominal 644.53125 MHz
 source used by the recovered fPLL configuration.
 
-The management image and its local result are now complete.  The next design
-stage is a small four-lane internal-loopback image.  Build reports, artifact
-hashes, exact status/error counters and hardware observations are recorded in
-`RESULTS.md` after each stage runs.
+The management image and the four-lane FPGA-internal loopback image are both
+locally complete.  At 10.3125 Gbit/s per lane, the internal image has verified
+the fPLL, all four TX/RX PMA paths, all four CDRs, the enhanced PCS block-lock
+path, independent error injection, and a 60-second zero-error soak.  Build
+reports, artifact hashes, exact status/error counters and hardware observations
+are recorded in `RESULTS.md`.
 
 ## Management image
 
@@ -113,3 +115,47 @@ quartus_pgm -c 1 -m jtag -o 'p;output_files/qsfp_mgmt.sof'
 the complete read-only inspection and refuses to write unless `MODPRSL=1`
 (module absent).  It then performs only the documented volatile broadcast/rate
 sequence and verifies readback.  See `RESULTS.md` for the accepted local run.
+
+## FPGA-internal loopback image
+
+Regenerate the fPLL, Native PHY and reset-controller IP, then compile:
+
+```bash
+./regenerate_loopback.sh
+quartus_sh --flow compile qsfp_internal_loopback
+quartus_sta -t report_loopback_timing.tcl
+```
+
+Before replacing the management image, require its read-only no-module gate:
+
+```bash
+/workspace/intelFPGA/22.1std/quartus/sopc_builder/bin/system-console \
+  --project_dir=. \
+  --jdi=output_files/qsfp_mgmt.jdi \
+  --script=preflight_no_module.tcl
+```
+
+If an older `QSL1` loopback image is already loaded, use
+`preflight_loaded_loopback.tcl` instead.  It is read-only and additionally
+requires the old image's high-speed source and safety enable to be off.
+
+After report review and the applicable preflight, load SRAM and run the test:
+
+```bash
+quartus_pgm -c 1 -m jtag \
+  -o 'p;output_files_loopback/qsfp_internal_loopback.sof'
+
+/workspace/intelFPGA/22.1std/quartus/sopc_builder/bin/system-console \
+  --project_dir=. \
+  --jdi=output_files_loopback/qsfp_internal_loopback.jdi \
+  --script=run_internal_loopback.tcl
+```
+
+The source defaults off.  The test enables it only after confirming no module,
+forces one clean reset sequence, checks all lock/calibration/FIFO states,
+injects an error into each lane separately, and runs a 60-second soak.  Its
+cleanup path returns the source to `0x00` on success or failure.
+
+This image proves only the FPGA-internal PMA/PCS loopback.  A compatible module,
+loopback assembly or second endpoint is still required to test the retimer
+datapath, cage contacts and external serial path.

@@ -1,6 +1,7 @@
 **/db/
 **/incremental_db/
 **/output_files/
+**/output_files*/
 **/*.log
 **/*.rpt
 **/*.summary
@@ -13,3 +14,8 @@
 
 # Platform Designer generated HDL. Recreate it from the tracked .qsys and Tcl.
 **/i2c_bridge/
+
+# QSFP fixed-rate transceiver IP generated from the tracked .qsys files.
+qsfp-superlite/fpll/
+qsfp-superlite/xcvr_superlite_ii/
+qsfp-superlite/xcvr_reset_controller/

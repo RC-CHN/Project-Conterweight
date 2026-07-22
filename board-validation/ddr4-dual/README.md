@@ -8,8 +8,10 @@ physical controller.
 
 The accepted local bring-up baseline is DDR4-1600: each memory clock is
 800 MHz and each quarter-rate user clock is 200 MHz. The fitted devices may
-support a higher community-tested rate, but this project does not claim
-DDR4-2133 timing or hardware validation.
+support a higher community-tested rate, and the memory model declares a
+DDR4-2133 speed bin, but this project does not claim DDR4-2133 timing or
+hardware validation. At DDR4-1600 the raw data-rate ceiling is 12.8 GB/s per
+64-bit data channel, or 25.6 GB/s for both channels before protocol overhead.
 
 The tracked `Qsys.qsys`, board pin assignments, and memory parameters originate
 from the community `DDR4_Dual` project. Platform Designer output, Quartus
@@ -36,6 +38,11 @@ destination-qualified exception `-setup`, ordinary payload data setup paths
 start elsewhere and remain timed. The constraint does not exclude hold,
 removal, FIFO-valid, controller, PHY, or board I/O paths.
 
+The ISSP BIST controls cross from the 100 MHz U59 clock into the two independent
+200 MHz EMIF user domains. `Constraints.sdc` cuts only the asynchronous input
+to the first register of each explicit two-flop synchronizer. The second
+synchronizer stages and all downstream control and memory paths remain timed.
+
 After report review and a JTAG IDCODE preflight, configure SRAM only:
 
 ```bash
@@ -52,13 +59,30 @@ Read both calibration/PLL/ECC states before any memory access:
   --script=read_status.tcl
 ```
 
-`test_ddr4.tcl` is deliberately a sampled bring-up test. It writes a complete
-64-byte data line at selected addresses in each independent 2 GiB Avalon
-aperture, verifies every word, and rechecks the exported ECC interrupts after
-each line. It stops immediately on an ECC indication. It does not claim a full
-capacity sweep or simultaneous dual-channel stress; those require full-width
-hardware traffic generators so that ECC lines can be initialized and exercised
-efficiently without a narrow JTAG bottleneck.
+Run one destructive full-aperture pass on both channels concurrently:
+
+```bash
+/workspace/intelFPGA/22.1std/quartus/sopc_builder/bin/system-console \
+  --project_dir=. \
+  --jdi=output_files/Catapult_v3_DDR4.jdi \
+  --script=run_sweep_bist.tcl
+```
+
+Each channel's on-chip BIST visits all 33,554,432 64-byte lines in its 2 GiB
+controller address range. It writes and then compares four deterministic data
+sequences: two per-lane LFSR seeds, a rotating one-hot bit, and a rotating
+one-cold bit. One pass produces 8 GiB of writes and 8 GiB of reads per channel.
+Both engines run at the same time and retain pass count, error count, first
+error address, and a 64-bit byte-error mask for JTAG inspection. This is a
+complete address/data-pattern sweep, not a peak-bandwidth benchmark: reads
+deliberately use one outstanding request so failures are easy to localize.
+
+The ISSP source defaults to enabling both BIST engines after configuration, so
+the design begins overwriting DDR as soon as calibration/reset release permits.
+`run_sweep_bist.tcl` stops, clears, and restarts both engines together to obtain
+a controlled measurement. `test_ddr4.tcl` stops the BIST before using the two
+JTAG-to-Avalon masters; it remains a useful sampled cross-check at seven
+addresses per channel.
 
 The accepted local build and hardware evidence are recorded in `RESULTS.md`.
 

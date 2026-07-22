@@ -14,6 +14,36 @@ proc counter_delta {new old} {
     return [expr {($new - $old) & 0xffffffff}]
 }
 
+proc bist_channel_status {raw base} {
+    set address_words [gray_to_binary [field $raw [expr {$base + 71}] 25]]
+    set first_error_words [field $raw [expr {$base + 96}] 25]
+    return [dict create \
+        running [field $raw $base 1] \
+        state [field $raw [expr {$base + 1}] 4] \
+        pattern [field $raw [expr {$base + 5}] 2] \
+        passes [gray_to_binary [field $raw [expr {$base + 7}] 32]] \
+        errors [gray_to_binary [field $raw [expr {$base + 39}] 32]] \
+        address_words $address_words \
+        address_bytes [expr {$address_words << 6}] \
+        first_error_words $first_error_words \
+        first_error_bytes [expr {$first_error_words << 6}] \
+        error_byte_mask [field $raw [expr {$base + 121}] 64]]
+}
+
+proc print_bist_channel {label status} {
+    puts [format \
+        "%s_bist: running=%u state=%u pattern=%u passes=%u errors=%u address=0x%08x first_error=0x%08x byte_mask=0x%016x" \
+        $label \
+        [dict get $status running] \
+        [dict get $status state] \
+        [dict get $status pattern] \
+        [dict get $status passes] \
+        [dict get $status errors] \
+        [dict get $status address_bytes] \
+        [dict get $status first_error_bytes] \
+        [dict get $status error_byte_mask]]
+}
+
 proc claim_ddr4_probe {} {
     for {set attempt 0} {$attempt < 10} {incr attempt} {
         foreach path [get_service_paths issp] {
@@ -30,6 +60,31 @@ proc claim_ddr4_probe {} {
         refresh_connections
     }
     error "DDR4 status probe not found after 10 service refresh attempts"
+}
+
+proc set_bist_control {value} {
+    if {$value < 0 || $value > 7} {
+        error "BIST control must fit in three bits"
+    }
+    lassign [claim_ddr4_probe] service path
+    issp_write_source_data $service [format 0x%x $value]
+    close_service issp $service
+    after 100
+    return $path
+}
+
+proc read_bist_status {} {
+    lassign [claim_ddr4_probe] service path
+    set raw [expr {[issp_read_probe_data $service]}]
+    close_service issp $service
+
+    set top [bist_channel_status $raw 107]
+    set bottom [bist_channel_status $raw 292]
+    puts "issp_path=$path"
+    puts [format "bist_control=0x%x" [field $raw 104 3]]
+    print_bist_channel top $top
+    print_bist_channel bottom $bottom
+    return [list $top $bottom]
 }
 
 proc read_ddr4_status {{require_ready 1}} {
@@ -85,4 +140,5 @@ proc read_ddr4_status {{require_ready 1}} {
 
 refresh_connections
 read_ddr4_status 1
+read_bist_status
 puts "dual_emif_status=PASS"

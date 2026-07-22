@@ -36,8 +36,8 @@ set_global_assignment -name NUM_PARALLEL_PROCESSORS 16
 # The two generated reset synchronizers each release more than 5,000 EMIF and
 # interconnect endpoints. Use global routing for their synchronous deassertion
 # so recovery time is not dominated by a regional high-fanout reset tree.
-set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to "*rst_controller_001*altera_reset_synchronizer_int_chain_out"
-set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to "*rst_controller_003*altera_reset_synchronizer_int_chain_out"
+set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to "Qsys:u0|altera_reset_controller:rst_controller_001|altera_reset_synchronizer:alt_rst_sync_uq1|altera_reset_synchronizer_int_chain_out"
+set_instance_assignment -name GLOBAL_SIGNAL "GLOBAL CLOCK" -to "Qsys:u0|altera_reset_controller:rst_controller|altera_reset_synchronizer:alt_rst_sync_uq1|altera_reset_synchronizer_int_chain_out"
 set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 2
 set_location_assignment PIN_AM17 -to leds[0]
 set_location_assignment PIN_AH18 -to leds[1]
@@ -67,6 +67,7 @@ set_instance_assignment -name IO_STANDARD "1.8 V" -to clk_u59
 set_instance_assignment -name IO_STANDARD LVDS -to clk_y4
 set_location_assignment PIN_J3 -to clk_y4
 set_global_assignment -name QSYS_FILE Qsys.qsys
+set_global_assignment -name IP_SEARCH_PATHS ip/**/*
 set_global_assignment -name VERILOG_FILE Catapult_v3_DDR4.v
 set_location_assignment PIN_AN3 -to emif_bot_mem_mem_a[0]
 set_location_assignment PIN_AM4 -to emif_bot_mem_mem_a[1]

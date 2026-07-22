@@ -49,11 +49,7 @@ module TopEntity (
 
 );
 
-reg [31:0] top_count;
-reg [31:0] bot_count;
 reg [31:0] alive_count;
-wire top_mem_clk;
-wire bot_mem_clk;
 wire top_cal_success;
 wire top_cal_fail;
 wire top_pll_locked;
@@ -62,9 +58,28 @@ wire bot_cal_success;
 wire bot_cal_fail;
 wire bot_pll_locked;
 wire bot_ecc_interrupt;
+wire [2:0] bist_control;
 
-wire [31:0] top_count_gray = top_count ^ (top_count >> 1);
-wire [31:0] bot_count_gray = bot_count ^ (bot_count >> 1);
+wire top_bist_running;
+wire [3:0] top_bist_state;
+wire [1:0] top_bist_pattern;
+wire [31:0] top_bist_heartbeat_gray;
+wire [31:0] top_bist_pass_count_gray;
+wire [31:0] top_bist_error_count_gray;
+wire [24:0] top_bist_address_gray;
+wire [24:0] top_bist_first_error_address;
+wire [63:0] top_bist_error_byte_mask;
+
+wire bot_bist_running;
+wire [3:0] bot_bist_state;
+wire [1:0] bot_bist_pattern;
+wire [31:0] bot_bist_heartbeat_gray;
+wire [31:0] bot_bist_pass_count_gray;
+wire [31:0] bot_bist_error_count_gray;
+wire [24:0] bot_bist_address_gray;
+wire [24:0] bot_bist_first_error_address;
+wire [63:0] bot_bist_error_byte_mask;
+
 wire [31:0] alive_count_gray = alive_count ^ (alive_count >> 1);
 
 // Probe layout, least-significant field first:
@@ -79,7 +94,32 @@ wire [31:0] alive_count_gray = alive_count ^ (alive_count >> 1);
 //   [101]     bottom PLL locked
 //   [102]     top ECC interrupt
 //   [103]     bottom ECC interrupt
-wire [103:0] ddr4_probe_data = {
+//   [106:104] BIST source/control readback: {clear, bottom enable, top enable}
+//   [291:107] top BIST status
+//   [476:292] bottom BIST status
+//
+// Each 185-bit BIST status is packed least-significant field first as:
+//   running[0], state[4:1], pattern[6:5], pass Gray[38:7],
+//   error Gray[70:39], address Gray[95:71], first-error address[120:96],
+//   byte-error mask[184:121].
+wire [476:0] ddr4_probe_data = {
+	bot_bist_error_byte_mask,
+	bot_bist_first_error_address,
+	bot_bist_address_gray,
+	bot_bist_error_count_gray,
+	bot_bist_pass_count_gray,
+	bot_bist_pattern,
+	bot_bist_state,
+	bot_bist_running,
+	top_bist_error_byte_mask,
+	top_bist_first_error_address,
+	top_bist_address_gray,
+	top_bist_error_count_gray,
+	top_bist_pass_count_gray,
+	top_bist_pattern,
+	top_bist_state,
+	top_bist_running,
+	bist_control,
 	bot_ecc_interrupt,
 	top_ecc_interrupt,
 	bot_pll_locked,
@@ -88,13 +128,13 @@ wire [103:0] ddr4_probe_data = {
 	top_pll_locked,
 	top_cal_fail,
 	top_cal_success,
-	top_count_gray,
-	bot_count_gray,
+	top_bist_heartbeat_gray,
+	bot_bist_heartbeat_gray,
 	alive_count_gray
 };
 
-assign leds[6] = top_count[27];
-assign leds[7] = bot_count[27];
+assign leds[6] = top_bist_heartbeat_gray[27];
+assign leds[7] = bot_bist_heartbeat_gray[27];
 assign leds[8] = alive_count[25];
 assign leds[0] = top_cal_success;
 assign leds[1] = top_cal_fail;
@@ -103,16 +143,6 @@ assign leds[3] = bot_cal_success;
 assign leds[4] = bot_cal_fail;
 assign leds[5] = bot_pll_locked;
 
-
-always @ (posedge top_mem_clk)
-begin
-top_count <= top_count + 1'b1;
-end
-
-always @ (posedge bot_mem_clk)
-begin
-bot_count <= bot_count + 1'b1;
-end
 
 always @ (posedge clk_u59)
 begin
@@ -123,21 +153,48 @@ altsource_probe #(
 	.sld_auto_instance_index("YES"),
 	.sld_instance_index(0),
 	.instance_id("DDR4"),
-	.probe_width(104),
-	.source_width(0),
+	.probe_width(477),
+	.source_width(3),
+	.source_initial_value("3"),
 	.enable_metastability("YES")
 ) ddr4_status_probe (
-	.probe(ddr4_probe_data)
+	.probe(ddr4_probe_data),
+	.source(bist_control),
+	.source_clk(clk_u59),
+	.source_ena(1'b1)
 );
 
 initial begin
-	top_count = 0;
-	bot_count = 0;
 	alive_count = 0;
 end
 
 
 	Qsys u0 (
+		// --------Full-aperture BIST controls and status
+		.bist_top_control_enable (bist_control[0]),
+		.bist_top_control_clear  (bist_control[2]),
+		.bist_top_status_running (top_bist_running),
+		.bist_top_status_state (top_bist_state),
+		.bist_top_status_pattern (top_bist_pattern),
+		.bist_top_status_heartbeat_gray (top_bist_heartbeat_gray),
+		.bist_top_status_pass_count_gray (top_bist_pass_count_gray),
+		.bist_top_status_error_count_gray (top_bist_error_count_gray),
+		.bist_top_status_address_gray (top_bist_address_gray),
+		.bist_top_status_first_error_address (top_bist_first_error_address),
+		.bist_top_status_error_byte_mask (top_bist_error_byte_mask),
+
+		.bist_bot_control_enable (bist_control[1]),
+		.bist_bot_control_clear  (bist_control[2]),
+		.bist_bot_status_running (bot_bist_running),
+		.bist_bot_status_state (bot_bist_state),
+		.bist_bot_status_pattern (bot_bist_pattern),
+		.bist_bot_status_heartbeat_gray (bot_bist_heartbeat_gray),
+		.bist_bot_status_pass_count_gray (bot_bist_pass_count_gray),
+		.bist_bot_status_error_count_gray (bot_bist_error_count_gray),
+		.bist_bot_status_address_gray (bot_bist_address_gray),
+		.bist_bot_status_first_error_address (bot_bist_first_error_address),
+		.bist_bot_status_error_byte_mask (bot_bist_error_byte_mask),
+
 		// --------CLOCKS
 		.clk_100_clk            (clk_u59),            	  //    clk_100.clk
 
@@ -163,7 +220,6 @@ end
 		.emif_top_oct_oct_rzqin   (emif_top_oct_oct_rzqin),   // 	  emif_top_oct.oct_rzqin
 		.emif_top_status_local_cal_success (top_cal_success),	//	  	  emif_top_status.local_cal_success
 		.emif_top_status_local_cal_fail    (top_cal_fail),		//              .local_cal_fail
-		.emif_top_emif_usr_clk_clk(top_mem_clk),
 		.emif_top_pll_locked_conduit_end_pll_locked(top_pll_locked),
 
 		// --------DDR4 Bottom
@@ -188,7 +244,6 @@ end
 		.emif_bot_oct_oct_rzqin   (emif_bot_oct_oct_rzqin),   // 	  emif_bot_oct.oct_rzqin
 		.emif_bot_status_local_cal_success (bot_cal_success),	//	     emif_bot_status.local_cal_success
 		.emif_bot_status_local_cal_fail    (bot_cal_fail),		//              .local_cal_fail
-		.emif_bot_emif_usr_clk_clk(bot_mem_clk),
 		.emif_bot_pll_locked_conduit_end_pll_locked(bot_pll_locked)
 	);
 

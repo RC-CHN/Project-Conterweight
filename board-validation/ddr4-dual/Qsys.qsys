@@ -9,6 +9,22 @@
    categories="System" />
  <parameter name="bonusData"><![CDATA[bonusData
 {
+   element bist_bot
+   {
+      datum _sortIndex
+      {
+         value = "6";
+         type = "int";
+      }
+   }
+   element bist_top
+   {
+      datum _sortIndex
+      {
+         value = "5";
+         type = "int";
+      }
+   }
    element clk_100
    {
       datum _sortIndex
@@ -91,20 +107,35 @@
  <parameter name="timeStamp" value="0" />
  <parameter name="useTestBenchNamingPattern" value="false" />
  <instanceScript></instanceScript>
+ <interface
+   name="bist_bot_control"
+   internal="bist_bot.control"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="bist_bot_status"
+   internal="bist_bot.status"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="bist_top_control"
+   internal="bist_top.control"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="bist_top_status"
+   internal="bist_top.status"
+   type="conduit"
+   dir="end" />
  <interface name="clk_100" internal="clk_100.clk_in" type="clock" dir="end" />
+ <interface
+   name="emif_0_pll_extra_clk_0_conduit_end"
+   internal="emif_bot.pll_extra_clk_0_conduit_end" />
  <interface
    name="emif_bot_ctrl_ecc_user_interrupt_0"
    internal="emif_bot.ctrl_ecc_user_interrupt_0"
    type="conduit"
    dir="end" />
- <interface
-   name="emif_0_pll_extra_clk_0_conduit_end"
-   internal="emif_bot.pll_extra_clk_0_conduit_end" />
- <interface
-   name="emif_bot_emif_usr_clk"
-   internal="emif_bot.emif_usr_clk"
-   type="clock"
-   dir="start" />
  <interface name="emif_bot_mem" internal="emif_bot.mem" type="conduit" dir="end" />
  <interface name="emif_bot_oct" internal="emif_bot.oct" type="conduit" dir="end" />
  <interface
@@ -127,11 +158,6 @@
    internal="emif_top.ctrl_ecc_user_interrupt_0"
    type="conduit"
    dir="end" />
- <interface
-   name="emif_top_emif_usr_clk"
-   internal="emif_top.emif_usr_clk"
-   type="clock"
-   dir="start" />
  <interface name="emif_top_mem" internal="emif_top.mem" type="conduit" dir="end" />
  <interface name="emif_top_oct" internal="emif_top.oct" type="conduit" dir="end" />
  <interface
@@ -149,13 +175,27 @@
    internal="emif_top.status"
    type="conduit"
    dir="end" />
- <module name="clk_100" kind="clock_source" version="20.1" enabled="1">
+ <module name="bist_bot" kind="ddr4_sweep_bist" version="1.0" enabled="1">
+  <parameter name="ADDRESS_WIDTH" value="25" />
+  <parameter name="BYTE_ENABLE_WIDTH" value="64" />
+  <parameter name="CHANNEL_ID" value="1" />
+  <parameter name="DATA_WIDTH" value="512" />
+  <parameter name="PATTERN_COUNT" value="4" />
+ </module>
+ <module name="bist_top" kind="ddr4_sweep_bist" version="1.0" enabled="1">
+  <parameter name="ADDRESS_WIDTH" value="25" />
+  <parameter name="BYTE_ENABLE_WIDTH" value="64" />
+  <parameter name="CHANNEL_ID" value="0" />
+  <parameter name="DATA_WIDTH" value="512" />
+  <parameter name="PATTERN_COUNT" value="4" />
+ </module>
+ <module name="clk_100" kind="clock_source" version="22.1" enabled="1">
   <parameter name="clockFrequency" value="100000000" />
   <parameter name="clockFrequencyKnown" value="true" />
   <parameter name="inputClockFrequency" value="0" />
   <parameter name="resetSynchronousEdges" value="NONE" />
  </module>
- <module name="emif_bot" kind="altera_emif" version="20.1" enabled="1">
+ <module name="emif_bot" kind="altera_emif" version="22.1" enabled="1">
   <parameter name="BOARD_DDR3_AC_TO_CK_SKEW_NS" value="0.0" />
   <parameter name="BOARD_DDR3_BRD_SKEW_WITHIN_AC_NS" value="0.02" />
   <parameter name="BOARD_DDR3_BRD_SKEW_WITHIN_DQS_NS" value="0.02" />
@@ -1185,10 +1225,10 @@
   <parameter name="SYS_INFO_DEVICE" value="10AXF40AA" />
   <parameter name="SYS_INFO_DEVICE_FAMILY" value="Arria 10" />
   <parameter name="SYS_INFO_DEVICE_SPEEDGRADE" value="2" />
-  <parameter name="SYS_INFO_UNIQUE_ID">$${FILENAME}_emif_bot</parameter>
+  <parameter name="SYS_INFO_UNIQUE_ID" value="Qsys_emif_bot" />
   <parameter name="TRAIT_SUPPORTS_VID" value="0" />
  </module>
- <module name="emif_top" kind="altera_emif" version="20.1" enabled="1">
+ <module name="emif_top" kind="altera_emif" version="22.1" enabled="1">
   <parameter name="BOARD_DDR3_AC_TO_CK_SKEW_NS" value="0.0" />
   <parameter name="BOARD_DDR3_BRD_SKEW_WITHIN_AC_NS" value="0.02" />
   <parameter name="BOARD_DDR3_BRD_SKEW_WITHIN_DQS_NS" value="0.02" />
@@ -2218,13 +2258,13 @@
   <parameter name="SYS_INFO_DEVICE" value="10AXF40AA" />
   <parameter name="SYS_INFO_DEVICE_FAMILY" value="Arria 10" />
   <parameter name="SYS_INFO_DEVICE_SPEEDGRADE" value="2" />
-  <parameter name="SYS_INFO_UNIQUE_ID">$${FILENAME}_emif_top</parameter>
+  <parameter name="SYS_INFO_UNIQUE_ID" value="Qsys_emif_top" />
   <parameter name="TRAIT_SUPPORTS_VID" value="0" />
  </module>
  <module
    name="master_bot"
    kind="altera_jtag_avalon_master"
-   version="20.1"
+   version="22.1"
    enabled="1">
   <parameter name="AUTO_DEVICE" value="10AXF40AA" />
   <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
@@ -2238,7 +2278,7 @@
  <module
    name="master_top"
    kind="altera_jtag_avalon_master"
-   version="20.1"
+   version="22.1"
    enabled="1">
   <parameter name="AUTO_DEVICE" value="10AXF40AA" />
   <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
@@ -2251,7 +2291,25 @@
  </module>
  <connection
    kind="avalon"
-   version="20.1"
+   version="22.1"
+   start="bist_top.avm"
+   end="emif_top.ctrl_amm_0">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="22.1"
+   start="bist_bot.avm"
+   end="emif_bot.ctrl_amm_0">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="22.1"
    start="emif_top.cal_debug_out"
    end="emif_bot.cal_debug">
   <parameter name="arbitrationPriority" value="1" />
@@ -2260,7 +2318,7 @@
  </connection>
  <connection
    kind="avalon"
-   version="20.1"
+   version="22.1"
    start="master_top.master"
    end="emif_top.ctrl_amm_0">
   <parameter name="arbitrationPriority" value="1" />
@@ -2269,7 +2327,7 @@
  </connection>
  <connection
    kind="avalon"
-   version="20.1"
+   version="22.1"
    start="master_bot.master"
    end="emif_bot.ctrl_amm_0">
   <parameter name="arbitrationPriority" value="1" />
@@ -2278,44 +2336,64 @@
  </connection>
  <connection
    kind="clock"
-   version="20.1"
+   version="22.1"
    start="emif_top.cal_debug_out_clk"
    end="emif_bot.cal_debug_clk" />
- <connection kind="clock" version="20.1" start="clk_100.clk" end="master_top.clk" />
- <connection kind="clock" version="20.1" start="clk_100.clk" end="master_bot.clk" />
+ <connection kind="clock" version="22.1" start="clk_100.clk" end="master_top.clk" />
+ <connection kind="clock" version="22.1" start="clk_100.clk" end="master_bot.clk" />
+ <connection
+   kind="clock"
+   version="22.1"
+   start="emif_top.emif_usr_clk"
+   end="bist_top.clock" />
+ <connection
+   kind="clock"
+   version="22.1"
+   start="emif_bot.emif_usr_clk"
+   end="bist_bot.clock" />
  <connection
    kind="reset"
-   version="20.1"
+   version="22.1"
    start="emif_top.cal_debug_out_reset_n"
    end="emif_bot.cal_debug_reset_n" />
  <connection
    kind="reset"
-   version="20.1"
+   version="22.1"
    start="clk_100.clk_reset"
    end="master_top.clk_reset" />
  <connection
    kind="reset"
-   version="20.1"
+   version="22.1"
    start="clk_100.clk_reset"
    end="master_bot.clk_reset" />
  <connection
    kind="reset"
-   version="20.1"
+   version="22.1"
    start="clk_100.clk_reset"
    end="emif_bot.global_reset_n" />
  <connection
    kind="reset"
-   version="20.1"
+   version="22.1"
    start="clk_100.clk_reset"
    end="emif_top.global_reset_n" />
  <connection
    kind="reset"
-   version="20.1"
+   version="22.1"
+   start="emif_top.emif_usr_reset_n"
+   end="bist_top.reset" />
+ <connection
+   kind="reset"
+   version="22.1"
+   start="emif_bot.emif_usr_reset_n"
+   end="bist_bot.reset" />
+ <connection
+   kind="reset"
+   version="22.1"
    start="master_top.master_reset"
    end="clk_100.clk_in_reset" />
  <connection
    kind="reset"
-   version="20.1"
+   version="22.1"
    start="master_bot.master_reset"
    end="clk_100.clk_in_reset" />
  <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />

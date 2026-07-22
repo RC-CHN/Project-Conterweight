@@ -23,8 +23,29 @@ Both controllers reported PLL lock and successful local calibration, with no
 calibration-failure or ECC-interrupt indication. Independent Gray-coded user
 clock counters advanced on both channels.
 
-The final sampled test wrote and read one complete 64-byte line at each of
-these byte addresses through each channel's own JTAG-to-Avalon master:
+The controlled hardware BIST ran both channels simultaneously and completed
+one pass in `27.345` seconds. Per channel, the pass addressed every 64-byte line
+from byte address `0x00000000` through `0x7fffffc0`, covering the complete
+configured 2 GiB user-data range. Four write/read/compare patterns produced
+16 GiB of traffic per channel: two independent per-lane LFSR sequences, a
+rotating one-hot bit, and a rotating one-cold bit. Both error counters and both
+64-bit byte-error masks remained zero. The script ended with:
+
+```text
+dual_full_aperture_bist=PASS elapsed_seconds=27.345
+bytes_per_channel_per_pass=17179869184
+usable_bytes_covered_per_channel=2147483648
+simultaneous_channels=YES
+```
+
+The engines had also been enabled by the ISSP power-up value before the
+controlled restart; the first status capture observed four completed passes on
+each channel with zero errors. Only the explicitly cleared/restarted pass is
+used for the recorded elapsed time.
+
+After stopping both BIST engines, the sampled JTAG cross-check wrote and read
+one complete 64-byte line at each of these byte addresses through each
+channel's own JTAG-to-Avalon master:
 
 ```text
 0x00000000  0x00001000  0x00100000  0x01000000
@@ -32,20 +53,23 @@ these byte addresses through each channel's own JTAG-to-Avalon master:
 ```
 
 All 16 32-bit words matched at all 14 channel/address combinations. Both ECC
-interrupts remained zero after every line and at the final check. The accepted
-script ended with:
+interrupts remained zero after every line and at the final check. This also
+verifies that both explicit JTAG masters still work through Platform Designer
+arbitration after the on-chip masters stop. The sampled script ended with:
 
 ```text
 sampled_dual_ddr4=PASS
-full_capacity_tested=NO
-simultaneous_stress_tested=NO
 ```
 
-This proves basic operation of both independent controllers and sampled access
-across each configured 2 GiB Avalon aperture. It does not prove the complete
-fitted 5 GB capacity, the approximately 4.5 GB community-reported usable
-capacity, every address/data bit, long-duration retention, or simultaneous
-dual-channel bandwidth.
+Together, the BIST and JTAG results verify both independent controllers, every
+address in each controller's configured 2 GiB range, multiple data patterns,
+and concurrent dual-channel operation. The result is 4 GiB of locally verified
+user data in total. It does not establish the community-reported 5 GB fitted /
+approximately 4.5 GB usable organization, because this controller geometry
+exposes exactly 2 GiB of user data per channel; any claimed additional user
+capacity needs a separate geometry and board-population audit. It also does not
+prove long-duration retention, maximum sustainable bandwidth, or full-load
+thermal behavior.
 
 ## Build and timing audit
 
@@ -55,16 +79,16 @@ dual-channel bandwidth.
 - Assembler: 0 errors, 0 warnings.
 - Timing Analyzer: 0 errors, 17 warnings.
 - Setup and hold requirements are fully constrained.
-- Worst setup slack: `+0.657 ns`.
-- Worst hold slack: `+0.012 ns`.
-- Worst recovery slack: `+0.259 ns`.
-- Worst removal slack: `+0.158 ns`.
+- Worst setup slack: `+0.423 ns`.
+- Worst hold slack: `+0.013 ns`.
+- Worst recovery slack: `+0.266 ns`.
+- Worst removal slack: `+0.174 ns`.
 - Worst minimum pulse-width slack: `+0.300 ns`.
-- SOF size: `36,854,318` bytes.
+- SOF size: `36,858,933` bytes.
 - SOF SHA-256:
-  `45db8d72aac1e96ff52833c62091419ec73781527f19f1a6db219ccb73cbb6e7`.
-- SRAM programming: success, 0 errors, 0 warnings, 56 seconds.
-- Programmer SOF checksum: `0x30A1B5FB`.
+  `9725aef1202a5e6fc51d66ba13d1fea73e870550153e35e3b7ebdfac48853a38`.
+- SRAM programming: success, 0 errors, 0 warnings, 53 seconds.
+- Programmer SOF checksum: `0x30DDFC66`.
 
 The two EMIF read-response FIFOs contain asynchronously cleared 512-bit RAM
 payload output registers. Their payload is invalid while the separately reset
@@ -75,6 +99,14 @@ logic, ordinary data setup, hold, removal, and board I/O remain timed. Before
 this narrow exception was applied, the worst recovery report was inspected at
 2000-path depth; all 512 negative-slack paths were those top-channel payload
 bits, while control recovery paths were non-negative at DDR4-1600.
+
+The four ISSP-to-BIST control crossings terminate at the first registers of
+explicit two-flop synchronizers. The final SDC cuts only those four asynchronous
+input paths. Netlist queries confirmed that every exception matches exactly one
+first-stage register; the second-stage and all downstream paths remain timed.
+An intermediate audit exposed the uncut CDC paths as approximately `-5.3 ns`
+setup violations, which were not accepted as a finished build. After applying
+the precise CDC constraints and refitting, setup TNS is zero at every corner.
 
 The remaining critical warnings require care:
 
@@ -99,29 +131,33 @@ Before programming, the FT232H enumerated at USB High-Speed, JTAG returned
 `0x02E060DD`, and the plugin reported 15 MHz TCK. The SOF was loaded only into
 volatile SRAM. A post-load IDCODE scan succeeded before the final memory test.
 
-System Console exposes one ISSP status service, the two explicit data masters,
-and an additional EMIF calibration/debug master. `test_ddr4.tcl` deliberately
-selects only `master_bot.master` and `master_top.master`; it does not send data
-traffic through the calibration master.
+System Console exposes one ISSP status/control service, the two explicit data
+masters, and an additional EMIF calibration/debug master. `run_sweep_bist.tcl`
+controls the two on-chip engines through ISSP. `test_ddr4.tcl` first stops the
+BIST and then deliberately selects only `master_bot.master` and
+`master_top.master`; it does not send data traffic through the calibration
+master.
 
 QSPI Flash was untouched. Both PCIe interfaces are absent from this SRAM image
 and therefore are not trained while it runs. Flash still contains
 `pcie-temp-demo`, which will return after a board power cycle.
 
-The test was short and did not constitute sustained thermal loading. The last
-management-I2C reading before DDR bring-up was approximately 35.0 C local and
-43.125 C remote, but this DDR image has no temperature telemetry, so a future
-long-running traffic generator must add temperature monitoring and require
-server-class airflow.
+The controlled pass was short and did not constitute sustained thermal loading
+or a maximum-bandwidth test. The last management-I2C reading before DDR
+bring-up was approximately 35.0 C local and
+43.125 C remote, but this DDR image has no temperature telemetry. A future
+long-duration run must add temperature monitoring and require server-class
+airflow.
 
 ## Remaining work
 
-- Add full-width hardware traffic generators so ECC lines can be exercised at
-  useful bandwidth without the narrow JTAG path.
-- Run walking-bit, fixed-pattern, pseudorandom, address-line, and broad capacity
-  tests independently on both channels.
-- Run simultaneous dual-channel stress with error counters and temperature
-  logging.
-- Revisit DDR4-2133 only after its generated interconnect reset-release paths
-  close without waiving control logic; the accepted local baseline is
-  DDR4-1600.
+- Add pipelined/multiple-outstanding traffic modes and throughput counters for
+  a maximum-sustainable-bandwidth test; the current BIST prioritizes exhaustive
+  coverage and error localization.
+- Add temperature telemetry and run hours-long simultaneous dual-channel
+  endurance/retention testing under confirmed server-class airflow.
+- Audit the physical memory population and geometry before claiming the
+  community-reported capacity beyond the verified 4 GiB of user data.
+- Evaluate DDR4-1866/2133 as separate regenerated EMIF configurations. The
+  memory model declares a DDR4-2133 speed bin, but the accepted local baseline
+  remains DDR4-1600 and the generic FPGA target lacks a concrete speed grade.

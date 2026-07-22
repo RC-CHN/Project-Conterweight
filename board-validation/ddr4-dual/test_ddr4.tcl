@@ -1,5 +1,14 @@
 source [file join [file dirname [info script]] read_status.tcl]
 
+# The full-aperture BIST is the other master on each controller and starts by
+# default after configuration. Stop it and allow any accepted read to drain
+# before issuing focused JTAG-to-Avalon transactions.
+set_bist_control 0
+lassign [read_bist_status] top_bist bottom_bist
+if {[dict get $top_bist running] || [dict get $bottom_bist running]} {
+    error "Failed to stop both full-aperture BIST engines"
+}
+
 proc words_to_hex {words} {
     set result {}
     foreach word $words {
@@ -84,5 +93,5 @@ foreach master $claimed {
 
 read_ddr4_status 1
 puts "sampled_dual_ddr4=PASS"
-puts "full_capacity_tested=NO"
-puts "simultaneous_stress_tested=NO"
+puts "sampled_script_full_capacity_tested=NO"
+puts "sampled_script_simultaneous_stress_tested=NO"

@@ -41,3 +41,7 @@ output_files/
 Qsys/
 Software/
 .qsys_edit/
+
+# Board-specific local recovery artifacts (never commit another card's image).
+backup-original-*.jic
+backup.log

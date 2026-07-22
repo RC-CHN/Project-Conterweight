@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system name="$${FILENAME}">
+ <component
+   name="$${FILENAME}"
+   displayName="$${FILENAME}"
+   version="1.0"
+   description=""
+   tags=""
+   categories="" />
+ <parameter name="bonusData"><![CDATA[bonusData
+{
+   element clk_100
+   {
+      datum _sortIndex
+      {
+         value = "0";
+         type = "int";
+      }
+   }
+   element i2c_ch1
+   {
+      datum _sortIndex
+      {
+         value = "2";
+         type = "int";
+      }
+   }
+   element i2c_ch2
+   {
+      datum _sortIndex
+      {
+         value = "3";
+         type = "int";
+      }
+   }
+   element jtag_master
+   {
+      datum _sortIndex
+      {
+         value = "1";
+         type = "int";
+      }
+   }
+}
+]]></parameter>
+ <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
+ <parameter name="device" value="10AXF40AA" />
+ <parameter name="deviceFamily" value="Arria 10" />
+ <parameter name="deviceSpeedGrade" value="2" />
+ <parameter name="fabricMode" value="QSYS" />
+ <parameter name="generateLegacySim" value="false" />
+ <parameter name="generationId" value="0" />
+ <parameter name="globalResetBus" value="false" />
+ <parameter name="hdlLanguage" value="VERILOG" />
+ <parameter name="hideFromIPCatalog" value="false" />
+ <parameter name="lockedInterfaceDefinition" value="" />
+ <parameter name="maxAdditionalLatency" value="1" />
+ <parameter name="projectName" value="" />
+ <parameter name="sopcBorderPoints" value="false" />
+ <parameter name="systemHash" value="0" />
+ <parameter name="testBenchDutName" value="" />
+ <parameter name="timeStamp" value="0" />
+ <parameter name="useTestBenchNamingPattern" value="false" />
+ <instanceScript></instanceScript>
+ <interface name="clk_100" internal="clk_100.clk_in" type="clock" dir="end" />
+ <interface name="i2c_ch1" internal="i2c_ch1.i2c_serial" type="conduit" dir="end" />
+ <interface name="i2c_ch2" internal="i2c_ch2.i2c_serial" type="conduit" dir="end" />
+ <interface name="reset" internal="clk_100.clk_in_reset" type="reset" dir="end" />
+ <module name="clk_100" kind="clock_source" version="22.1" enabled="1">
+  <parameter name="clockFrequency" value="100000000" />
+  <parameter name="clockFrequencyKnown" value="true" />
+  <parameter name="inputClockFrequency" value="0" />
+  <parameter name="resetSynchronousEdges" value="NONE" />
+ </module>
+ <module name="i2c_ch1" kind="altera_avalon_i2c" version="22.1" enabled="1">
+  <parameter name="FIFO_DEPTH" value="4" />
+  <parameter name="USE_AV_ST" value="0" />
+  <parameter name="clockRate" value="100000000" />
+ </module>
+ <module name="i2c_ch2" kind="altera_avalon_i2c" version="22.1" enabled="1">
+  <parameter name="FIFO_DEPTH" value="4" />
+  <parameter name="USE_AV_ST" value="0" />
+  <parameter name="clockRate" value="100000000" />
+ </module>
+ <module
+   name="jtag_master"
+   kind="altera_jtag_avalon_master"
+   version="22.1"
+   enabled="1">
+  <parameter name="AUTO_DEVICE" value="10AXF40AA" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Arria 10" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="2" />
+  <parameter name="COMPONENT_CLOCK" value="0" />
+  <parameter name="FAST_VER" value="0" />
+  <parameter name="FIFO_DEPTHS" value="2" />
+  <parameter name="PLI_PORT" value="50000" />
+  <parameter name="USE_PLI" value="0" />
+ </module>
+ <connection
+   kind="avalon"
+   version="22.1"
+   start="jtag_master.master"
+   end="i2c_ch1.csr">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="22.1"
+   start="jtag_master.master"
+   end="i2c_ch2.csr">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0040" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection kind="clock" version="22.1" start="clk_100.clk" end="jtag_master.clk" />
+ <connection kind="clock" version="22.1" start="clk_100.clk" end="i2c_ch1.clock" />
+ <connection kind="clock" version="22.1" start="clk_100.clk" end="i2c_ch2.clock" />
+ <connection
+   kind="reset"
+   version="22.1"
+   start="clk_100.clk_reset"
+   end="jtag_master.clk_reset" />
+ <connection
+   kind="reset"
+   version="22.1"
+   start="clk_100.clk_reset"
+   end="i2c_ch1.reset_sink" />
+ <connection
+   kind="reset"
+   version="22.1"
+   start="clk_100.clk_reset"
+   end="i2c_ch2.reset_sink" />
+ <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
+ <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.insertDefaultSlave" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.maxAdditionalLatency" value="1" />
+</system>

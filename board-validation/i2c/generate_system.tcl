@@ -1,0 +1,57 @@
+package require -exact qsys 16.0
+
+create_system i2c_bridge
+set_project_property DEVICE_FAMILY "Arria 10"
+set_project_property DEVICE 10AXF40AA
+
+add_instance clk_100 clock_source
+set_instance_parameter_value clk_100 clockFrequency 100000000
+set_instance_parameter_value clk_100 clockFrequencyKnown true
+set_instance_parameter_value clk_100 resetSynchronousEdges NONE
+
+add_instance jtag_master altera_jtag_avalon_master
+set_instance_parameter_value jtag_master AUTO_DEVICE 10AXF40AA
+set_instance_parameter_value jtag_master AUTO_DEVICE_FAMILY "Arria 10"
+set_instance_parameter_value jtag_master AUTO_DEVICE_SPEEDGRADE 2
+set_instance_parameter_value jtag_master COMPONENT_CLOCK 0
+set_instance_parameter_value jtag_master FAST_VER 0
+set_instance_parameter_value jtag_master FIFO_DEPTHS 2
+set_instance_parameter_value jtag_master PLI_PORT 50000
+set_instance_parameter_value jtag_master USE_PLI 0
+
+foreach instance {i2c_ch1 i2c_ch2} {
+    add_instance $instance altera_avalon_i2c
+    set_instance_parameter_value $instance FIFO_DEPTH 4
+    set_instance_parameter_value $instance USE_AV_ST 0
+    set_instance_parameter_value $instance clockRate 100000000
+
+    add_connection clk_100.clk $instance.clock
+    add_connection clk_100.clk_reset $instance.reset_sink
+}
+
+add_connection clk_100.clk jtag_master.clk
+add_connection clk_100.clk_reset jtag_master.clk_reset
+
+add_connection jtag_master.master i2c_ch1.csr
+set_connection_parameter_value jtag_master.master/i2c_ch1.csr baseAddress 0x0000
+set_connection_parameter_value jtag_master.master/i2c_ch1.csr arbitrationPriority 1
+set_connection_parameter_value jtag_master.master/i2c_ch1.csr defaultConnection false
+
+add_connection jtag_master.master i2c_ch2.csr
+set_connection_parameter_value jtag_master.master/i2c_ch2.csr baseAddress 0x0040
+set_connection_parameter_value jtag_master.master/i2c_ch2.csr arbitrationPriority 1
+set_connection_parameter_value jtag_master.master/i2c_ch2.csr defaultConnection false
+
+add_interface clk_100 clock sink
+set_interface_property clk_100 EXPORT_OF clk_100.clk_in
+
+add_interface i2c_ch1 conduit end
+set_interface_property i2c_ch1 EXPORT_OF i2c_ch1.i2c_serial
+
+add_interface i2c_ch2 conduit end
+set_interface_property i2c_ch2 EXPORT_OF i2c_ch2.i2c_serial
+
+set_interconnect_requirement {$system} qsys_mm.clockCrossingAdapter HANDSHAKE
+set_interconnect_requirement {$system} qsys_mm.maxAdditionalLatency 1
+
+save_system i2c_bridge.qsys

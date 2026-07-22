@@ -21,7 +21,7 @@
 | JTAG TCK | 插件报告 `15M` |
 | 配置 Flash | Quartus 识别为 `MT25QU01G`，Examine silicon ID `0x21` |
 | 当前 Flash 上电设计 | `pcie-temp-demo` |
-| 当前 SRAM 设计 | `board-validation/io-smoke`（后续验证会继续替换） |
+| 当前 SRAM 设计 | `board-validation/i2c`（后续验证会继续替换） |
 | 当前主 PCIe 端点 | `1172:e003`，最近枚举地址 `0000:6a:00.0` |
 
 ## 本地已验证
@@ -47,6 +47,21 @@
 - 详细构建、时序和实测记录见 [board-validation/io-smoke/RESULTS.md](board-validation/io-smoke/RESULTS.md)。
 
 目前仍需人工观察正在运行的逐灯脚本，才能记录 LED 位到物理位置的映射和实际发光极性；J11 也需要 1.8 V 安全外部激励才能验证排针连续性。这两项不能仅靠 FPGA 探针代替。
+
+### 两条 FPGA I2C 总线
+
+- `board-validation/i2c` 已用 Quartus 22.1 对 `10AXF40AA` 完整编译，0 errors、9 warnings，并通过 SRAM 配置。
+- SOF SHA-256 为 `c0f35d8d3f8f204b4dcd7a6b4cfee05de64cfb6f9cbdd772d4f2e21a9849e52a`。
+- Timing Analyzer 报告 setup/hold 完全约束；最差 setup 为 `+5.456 ns`，最差 hold 为 `+0.016 ns`，其余 recovery/removal 和 pulse-width slack 均为正。
+- channel 1（`K20/L20`）两轮稳定响应 `0x22`，与 DS250DF810 retimer 资料一致。
+- channel 2（`J23/K21`）两轮稳定响应 `0x0c 0x1f 0x27 0x40 0x42 0x4c 0x51 0x6d`。
+- TMP411 由 MFR ID `0x55`、device ID `0x12` 明确识别；本次本地/远端温度约为 `35.000 C` / `43.125 C`。
+- `0x27` 读回 PCA9535 配置页 `ff ff`，身份得到强支持；`0x51` EEPROM 和 `0x6d` PCIe 时钟缓冲器与 BOM/数据手册地址相符。
+- `0x0c`、`0x1f`、`0x40`、`0x42` 暂不强行命名；`0x40` 稳定 ACK，但 NACK LM25066 必须支持的 `MFR_ID(0x99)` 和 `CAPABILITY(0x19)`，另两个只读命令只返回全 `ff`，因此不能标为正常 LM25066；`0x42` 的 MFR_ID 路径也只返回全 `ff`。
+- 扫描不写目标数据；定向 ID 脚本只选择只读指针/命令，没有写目标配置值。最终两路均为空闲高，FPGA OE 为 0。
+- 详细构建、地址证据、Intel `BUS_HOLD` 根因和一次开漏恢复记录见 [board-validation/i2c/RESULTS.md](board-validation/i2c/RESULTS.md)。
+
+本次没有发现常见地址 `0x50` 的 QSFP EEPROM，说明当前模块/线缆管理面尚不能标记为本地通过；retimer 的速率、通道和 CDR 寄存器也没有在 I2C 基础验证阶段改动。
 
 ### SFL 和 QSPI Flash
 
@@ -75,26 +90,7 @@
 
 新工程计划放入独立的 `board-validation/` 目录，各子项目保留源文件、约束和验证记录，不提交 `db/`、`incremental_db/`、日志或大型编程文件。
 
-### 1. 两条 FPGA I2C 总线
-
-计划建立 `board-validation/i2c/`：
-
-- 使用开漏方式驱动，确认空闲电平后再开始事务。
-- 先做只读地址扫描，再做器件识别和只读寄存器读取。
-- 检查 retimer `DS250DF810`（社区地址 `0x22`）、QSFP EEPROM、板载 EEPROM、外部温度、电源监控、时钟和 GPIO 扩展器。
-- 为每个响应地址记录总线号、器件推测、只读证据和是否允许写入。
-- 对 retimer 的速率或通道寄存器写入单独审批和记录；普通扫描阶段不改器件配置。
-
-社区工程给出的 FPGA I2C 引脚为：
-
-| 总线 | SCL | SDA | I/O 标准 |
-| --- | --- | --- | --- |
-| channel 1 | `K20` | `L20` | 1.8 V，开漏 |
-| channel 2 | `J23` | `K21` | 1.8 V，开漏 |
-
-验收条件：两条总线都完成可重复扫描；已知器件地址与读回内容被记录；没有向未知地址写数据。
-
-### 2. 两组 DDR4
+### 1. 两组 DDR4
 
 计划分别建立 `board-validation/ddr4-top/` 和 `board-validation/ddr4-bottom/`，最后再考虑双通道工程：
 
@@ -106,7 +102,7 @@
 
 验收条件：两组 EMIF 分别校准成功；可用地址范围和容量有本地证据；长时间内存测试错误计数为 0；对应时钟和 EMIF 时序报告完成检查。
 
-### 3. QSFP+、retimer 和高速收发器
+### 2. QSFP+、retimer 和高速收发器
 
 计划建立 `board-validation/qsfp-superlite/`：
 

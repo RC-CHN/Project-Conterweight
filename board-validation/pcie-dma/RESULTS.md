@@ -56,7 +56,7 @@ size:   36,746,638 bytes
 SHA256: 6194a8d7dabbec9365699500d1e6e0e33e18ebd3b744b816ba3cabdd76d561a3
 ```
 
-## SRAM configuration
+## Initial Gen3 SRAM configuration
 
 Date: 2026-07-23 12:38–12:39 (Asia/Shanghai)
 
@@ -72,6 +72,30 @@ Date: 2026-07-23 12:38–12:39 (Asia/Shanghai)
 
 As expected on this host, Linux did not hot-enumerate `1172:e004` after FPGA
 reconfiguration. A host reboot was required before the BAR and DMA tests.
+
+## Gen2 SRAM configuration
+
+Date: 2026-07-23 16:29–16:31 (Asia/Shanghai)
+
+- pre-load JTAG: `02E060DD 10AT115S(1|2)`
+- cable: `JTAG-MPSSE-Blaster [00 Single RS232-HS]`
+- reported TCK: `15M`
+- programming target: `10AXF40AA@1`
+- Quartus programming-file checksum: `0x30DAA541`
+- transfer time: 53 seconds
+- Programmer result: successful, 0 errors, 0 warnings
+- post-load JTAG: `02E060DD 10AT115S(1|2)`
+- FT232H remained enumerated as `0403:6014` at USB high speed
+- no USB disconnect/reset, JTAG, PCIe AER, or DPC error was logged
+- no `1172:*` endpoint remained after hot FPGA reconfiguration, matching the
+  already established host limitation
+
+This design has no JTAG data/control master. LED0 is a divided 125 MHz
+application-clock heartbeat, LED1 is the fabric reset state, and LED2 is the
+synchronized PERST state; the other LEDs are scratch/error status. Software BAR
+and DMA validation is therefore intentionally deferred until the image starts
+from Flash during host boot. The successful SRAM configuration is a
+configuration-integrity and non-regression gate, not a PCIe enumeration result.
 
 ## First cold-enumeration result
 
@@ -183,7 +207,7 @@ SHA256: e68834a88b31621562d6edf00996211e10fdaee0cb4292cba9ea7398806e87e9
 - [x] review of every critical warning
 - [x] setup, hold, recovery/removal, pulse-width, and unconstrained-path reports
 - [x] generated Gen2 SOF target, size, and SHA-256
-- [ ] JTAG ID before and after Gen2 SRAM programming
+- [x] JTAG ID before and after Gen2 SRAM programming
 - [ ] MT25QU01G JIC generation, Program/Verify, and artifact hash
 - [ ] cold host enumeration as `1172:e004`
 - negotiated PCIe speed and width from `lspci -vv`

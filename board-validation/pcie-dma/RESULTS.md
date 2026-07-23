@@ -1,7 +1,7 @@
 # PCIe DMA validation results
 
-Status: build and post-fit timing passed; SRAM and PCIe DMA hardware tests are
-pending.
+Status: build, post-fit timing, and SRAM configuration passed; cold PCIe
+enumeration and DMA hardware tests are pending a host reboot.
 
 ## Build evidence
 
@@ -54,6 +54,23 @@ size:   36,746,638 bytes
 SHA256: 6194a8d7dabbec9365699500d1e6e0e33e18ebd3b744b816ba3cabdd76d561a3
 ```
 
+## SRAM configuration
+
+Date: 2026-07-23 12:38–12:39 (Asia/Shanghai)
+
+- pre-load JTAG: `02E060DD 10AT115S(1|2)`
+- cable: `JTAG-MPSSE-Blaster [00 Single RS232-HS]`
+- programming target: `10AXF40AA@1`
+- Quartus programming-file checksum: `0x30DD430B`
+- transfer time: 54 seconds
+- Programmer result: successful, 0 errors, 0 warnings
+- post-load JTAG: `02E060DD 10AT115S(1|2)`
+- FT232H remained enumerated as `0403:6014` at USB high speed
+- no post-load USB, JTAG, PCIe AER, disconnect, or reset error was logged
+
+As expected on this host, Linux did not hot-enumerate `1172:e004` after FPGA
+reconfiguration. A host reboot is required before the BAR and DMA tests.
+
 ## Warning review
 
 - Critical Warnings 17951 and 18655 report 40 unused RX and TX transceiver
@@ -78,7 +95,7 @@ SHA256: 6194a8d7dabbec9365699500d1e6e0e33e18ebd3b744b816ba3cabdd76d561a3
 - [x] review of every critical warning
 - [x] setup, hold, recovery/removal, pulse-width, and unconstrained-path reports
 - [x] generated SOF target, size, and SHA-256
-- JTAG ID before and after SRAM programming
+- [x] JTAG ID before and after SRAM programming
 - cold host enumeration as `1172:e004`
 - negotiated PCIe speed and width from `lspci -vv`
 - BAR0/BAR4 sizes and design ABI register readback

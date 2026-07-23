@@ -106,7 +106,9 @@
 - 测试前温度 `59.84 C`，结束温度 `61.20 C`；测试后两路引擎均停止，JTAG 仍稳定识别 `0x02E060DD`，QSPI Flash 未触碰。
 - 构建、warning 边界、两周期 reset recovery 约束和完整实测记录见 [board-validation/ddr4-2133/RESULTS.md](board-validation/ddr4-2133/RESULTS.md)。
 
-当前结论是两套控制器配置的完整 2 GiB/通道、共 4 GiB 用户数据已经在 DDR4-1600 和 DDR4-2133 两档完成本地全地址并发验证。这里的 2 GiB 不是缩窄的 JTAG 调试窗口，而是当前 25-bit word-address × 64-byte 数据宽度所能覆盖的完整控制器地址范围。该结果仍不能替代对社区所称 5 GB fitted / 约 4.5 GB usable 组织的颗粒与几何审计，也不是峰值带宽、长时间保持或满载热认证。
+当前结论是两套控制器配置的完整 2 GiB/通道、共 4 GiB 用户数据已经在 DDR4-1600 和 DDR4-2133 两档完成本地全地址并发验证。这里的 2 GiB 不是缩窄的 JTAG 调试窗口，而是当前 25-bit word-address × 64-byte 数据宽度所能覆盖的完整控制器地址范围。
+
+颗粒和控制器几何也已核对：每通道五颗 4 Gbit x16 颗粒提供 2.5 GiB 物理装载量，其中第五颗只连接 8/16 data bits，因此每通道 2.25 GiB 与 FPGA 相连。72-bit 接口中的 64 位形成 2 GiB 用户数据，8 位形成 0.25 GiB ECC；两通道合计即 5 GiB 物理装载、4.5 GiB 接线容量、4 GiB 用户数据和 0.5 GiB ECC。Avalon 的 `2^25` 个 64-byte word 也恰好是 2 GiB/通道，因此不存在尚未测试的额外 payload 地址空间。证据和计算见 [board-validation/ddr4-dual/GEOMETRY.md](board-validation/ddr4-dual/GEOMETRY.md)。剩余未完成的是峰值带宽、长时间保持和满载热认证。
 
 ### SFL 和 QSPI Flash
 
@@ -135,13 +137,14 @@
 
 新工程计划放入独立的 `board-validation/` 目录，各子项目保留源文件、约束和验证记录，不提交 `db/`、`incremental_db/`、日志或大型编程文件。
 
-### 1. DDR4 峰值带宽、长期热稳定和几何审计
+### 1. DDR4 峰值带宽和长期热稳定
 
 双控制器 2 GiB/通道的全地址并发 BIST 已经在 DDR4-1600 和 DDR4-2133 两档通过，下一步计划在现有工程基础上增加：
 
 - 支持多 outstanding/流水访问和吞吐量计数的 traffic generator，测量双通道最大可持续带宽。
 - 加入温度遥测，在服务器级气流下进行数小时并发耐久与保持测试。
-- 核对板上颗粒和控制器几何，解释社区 5 GB fitted / 约 4.5 GB usable 与当前已验证 4 GiB 用户数据之间的差异。
+
+容量几何审计已经完成：社区的 5 GiB 是物理颗粒总量，4.5 GiB 是接到 FPGA 的 72-bit raw/ECC 容量，而 EMIF 暴露的用户 payload 是 4 GiB；三者并不矛盾。
 
 验收条件：目标速率下完整时序闭合并校准成功；双通道长期并发错误计数为 0；持续负载下温度、供电和吞吐量稳定。
 
@@ -176,7 +179,7 @@
 1. 每次实验前检查 JTAG ID、USB 状态、气流和当前温度。
 2. 所有工程使用 Quartus 22.1 和 `10AXF40AA` 从源文件重新编译。
 3. 先完成 LED、时钟和输入采样，再扫描 I2C。
-4. DDR4 双控制器 2 GiB/通道的全地址并发 BIST 已在 1600/2133 MT/s 通过；后续做峰值带宽、长时间压力、温度遥测和颗粒/几何审计。
+4. DDR4 双控制器 2 GiB/通道的全地址并发 BIST 已在 1600/2133 MT/s 通过，颗粒/地址/ECC 几何已闭环；后续做峰值带宽、长时间压力和温度遥测。
 5. QSFP 管理面和低风险内部回环已通过；下一步只有具备合适端点时才验证外部高速路径。
 6. 新设计先写 SRAM；写入前不保留 PCIe BAR `mmap`，写入后重新检查 JTAG。
 7. 每个构建记录错误、critical warning、时序结果、SOF SHA-256、JTAG ID、温度和硬件现象。

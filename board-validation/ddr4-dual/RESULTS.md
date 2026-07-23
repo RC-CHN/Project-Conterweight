@@ -156,8 +156,9 @@ airflow.
   coverage and error localization.
 - Add temperature telemetry and run hours-long simultaneous dual-channel
   endurance/retention testing under confirmed server-class airflow.
-- Audit the physical memory population and geometry before claiming the
-  community-reported capacity beyond the verified 4 GiB of user data.
-- Evaluate DDR4-1866/2133 as separate regenerated EMIF configurations. The
-  memory model declares a DDR4-2133 speed bin, but the accepted local baseline
-  remains DDR4-1600 and the generic FPGA target lacks a concrete speed grade.
+- The physical population, 72-bit channel geometry, ECC overhead, Avalon
+  aperture and 5/4.5/4 GiB capacity terminology are reconciled in
+  [GEOMETRY.md](GEOMETRY.md). There is no untested payload aperture beyond the
+  verified 2 GiB/channel.
+- DDR4-2133 was subsequently evaluated as a separately regenerated and timed
+  configuration; see [../ddr4-2133/RESULTS.md](../ddr4-2133/RESULTS.md).

@@ -21,7 +21,7 @@
 | JTAG TCK | 插件报告 `15M` |
 | 配置 Flash | Quartus 识别为 `MT25QU01G`，Examine silicon ID `0x21` |
 | 当前 Flash 上电设计 | `pcie-temp-demo` |
-| 当前 SRAM 设计 | `board-validation/ddr4-2133` 的双通道 DDR4-2133 验证镜像，BIST 已停止（断电后仍回到 Flash 设计） |
+| 当前 SRAM 设计 | `board-validation/ddr4-2133` 的 64-outstanding 双通道带宽/完整性验证镜像，BIST 已停止（断电后仍回到 Flash 设计） |
 | 当前主 PCIe 端点 | `1172:e003`，最近枚举地址 `0000:6a:00.0` |
 
 ## 本地已验证
@@ -99,16 +99,19 @@
 在 1600 MT/s 基线上，又完成了独立的 DDR4-2133 提频验证：
 
 - `board-validation/ddr4-2133` 从已验证的 1600 配置可重复生成，两套 EMIF 都改为 1066.667 MHz 存储器时钟和约 266.7 MHz quarter-rate 用户时钟；两条 JTAG-to-DDR 数据路径从该变体移除。
-- 最终完整编译 0 errors、29 warnings，Fitter 选择 `10AXF40AA`；多角 setup/hold 完全约束且所有 TNS 为 0，最差 setup/hold/recovery/removal/pulse-width 分别为 `+0.269`/`+0.013`/`+0.574`/`+0.151`/`+0.143 ns`。
-- 最终 SOF 大小为 `36,857,644` 字节，SHA-256 为 `08206bc38b482294a7aed5dacfa2577d16cf9f04ae7ebcb9c6c41c6ce2a1c79c`；仅写入 SRAM，Programmer 0 errors、0 warnings。
+- 最新 64-outstanding 变体完整编译 0 errors、29 warnings，Fitter 选择 `10AXF40AA`；多角 setup/hold 完全约束且所有 TNS 为 0，最差 setup/hold/recovery/removal/pulse-width 分别为 `+0.195`/`+0.011`/`+0.465`/`+0.151`/`+0.143 ns`。
+- 最新 SOF 大小为 `36,860,417` 字节，SHA-256 为 `9a6d6ef905ac3dcf4461690bbfeb13266bb110449ca973f2c90d5adf7341339d`；仅写入 SRAM，Programmer 0 errors、0 warnings。
 - 两个控制器均再次报告 PLL locked、calibration success、无 calibration failure、无 ECC interrupt；默认 `bist_control=0`，配置后不会自行覆盖内存。
 - 最终双通道并发测试在 `36.284` 秒内每路完成 2 轮全地址/4 图样 BIST，即每通道 32 GiB、总计 64 GiB 写读流量；两路 error count、first-error address 和 byte-error mask 全为 0。
 - 测试前温度 `59.84 C`，结束温度 `61.20 C`；测试后两路引擎均停止，JTAG 仍稳定识别 `0x02E060DD`，QSPI Flash 未触碰。
+- 流水引擎仍逐条比较全部返回数据，并以用户时钟统计完整 8 GiB 写阶段和 8 GiB 读阶段。top/bottom 持续写带宽分别为 `11.448`/`11.398 GB/s`，持续校验读带宽均为 `16.271 GB/s`；双通道顺序写+读的保守合计为 `26.811 GB/s`。
+- 带宽测试因 JTAG 启停延迟实际完成 top 9 轮、bottom 8 轮全地址/4 图样 pass，error count 和 ECC interrupt 始终为 0；结束温度 `63.90 C`，清理后两路停止。
+- 随后执行了一次请求 60 秒、实际 `66.1` 秒的双通道短时耐久烟雾测试；两路各完成 49 轮，各校验 `841,813,590,016` 字节（约 784 GiB），合计约 1.53 TiB。数据错误和 ECC interrupt 均为 0，温度范围 `63.90` 至 `65.93 C`，最终 `65.26 C`；清理后 `bist_control=0`、两路 `running=0`。
 - 构建、warning 边界、两周期 reset recovery 约束和完整实测记录见 [board-validation/ddr4-2133/RESULTS.md](board-validation/ddr4-2133/RESULTS.md)。
 
 当前结论是两套控制器配置的完整 2 GiB/通道、共 4 GiB 用户数据已经在 DDR4-1600 和 DDR4-2133 两档完成本地全地址并发验证。这里的 2 GiB 不是缩窄的 JTAG 调试窗口，而是当前 25-bit word-address × 64-byte 数据宽度所能覆盖的完整控制器地址范围。
 
-颗粒和控制器几何也已核对：每通道五颗 4 Gbit x16 颗粒提供 2.5 GiB 物理装载量，其中第五颗只连接 8/16 data bits，因此每通道 2.25 GiB 与 FPGA 相连。72-bit 接口中的 64 位形成 2 GiB 用户数据，8 位形成 0.25 GiB ECC；两通道合计即 5 GiB 物理装载、4.5 GiB 接线容量、4 GiB 用户数据和 0.5 GiB ECC。Avalon 的 `2^25` 个 64-byte word 也恰好是 2 GiB/通道，因此不存在尚未测试的额外 payload 地址空间。证据和计算见 [board-validation/ddr4-dual/GEOMETRY.md](board-validation/ddr4-dual/GEOMETRY.md)。剩余未完成的是峰值带宽、长时间保持和满载热认证。
+颗粒和控制器几何也已核对：每通道五颗 4 Gbit x16 颗粒提供 2.5 GiB 物理装载量，其中第五颗只连接 8/16 data bits，因此每通道 2.25 GiB 与 FPGA 相连。72-bit 接口中的 64 位形成 2 GiB 用户数据，8 位形成 0.25 GiB ECC；两通道合计即 5 GiB 物理装载、4.5 GiB 接线容量、4 GiB 用户数据和 0.5 GiB ECC。Avalon 的 `2^25` 个 64-byte word 也恰好是 2 GiB/通道，因此不存在尚未测试的额外 payload 地址空间。证据和计算见 [board-validation/ddr4-dual/GEOMETRY.md](board-validation/ddr4-dual/GEOMETRY.md)。数小时持续负载和专用静态保持属于可选的进一步资格测试；本轮按用户决定在功能、带宽和 60 秒短时耐久验证通过后收工，不执行原计划的两小时压测，也不声称已完成长时资格认证。
 
 ### SFL 和 QSPI Flash
 
@@ -137,12 +140,9 @@
 
 新工程计划放入独立的 `board-validation/` 目录，各子项目保留源文件、约束和验证记录，不提交 `db/`、`incremental_db/`、日志或大型编程文件。
 
-### 1. DDR4 峰值带宽和长期热稳定
+### 1. DDR4 可选长期热稳定和静态保持
 
-双控制器 2 GiB/通道的全地址并发 BIST 已经在 DDR4-1600 和 DDR4-2133 两档通过，下一步计划在现有工程基础上增加：
-
-- 支持多 outstanding/流水访问和吞吐量计数的 traffic generator，测量双通道最大可持续带宽。
-- 加入温度遥测，在服务器级气流下进行数小时并发耐久与保持测试。
+双控制器 2 GiB/通道的全地址并发 BIST 已经在 DDR4-1600 和 DDR4-2133 两档通过；64-outstanding 流水访问、逐数据比较、双通道带宽计数和 60 秒短时耐久也已通过。如果后续需要生产级资格评估，可使用已提供的脚本在服务器级气流下执行数小时并发耐久，并增加明确的静态保持间隔。本轮按用户决定不执行两小时压测。
 
 容量几何审计已经完成：社区的 5 GiB 是物理颗粒总量，4.5 GiB 是接到 FPGA 的 72-bit raw/ECC 容量，而 EMIF 暴露的用户 payload 是 4 GiB；三者并不矛盾。
 
@@ -170,7 +170,7 @@
 | 50 Gbit/s 完整链路 | 需要 12.5 Gbit/s/lane 参数、匹配的另一端和更高热负载验证 | 40 Gbit/s 稳定通过后再升级 |
 | 高速信号眼图、抖动和正式 BER 裕量 | FPGA 状态计数器只能做数字功能判断，不能替代模拟信号完整性测量 | 出现无法解释的 CDR/BER 问题时借用高速示波器或 BERT |
 | 外部排针未知信号、U20/U22/U55 未知功能 | 资料不足，猜测性输出可能冲突或损伤器件 | 原理图追线、万用表确认电压域，并先做高阻输入观测 |
-| 满载热设计认证 | 已有 QSFP 60 秒和 DDR4-2133 36 秒短负载温度记录，最高约 61.20 C，但不能代表数小时持续满载 | 确保服务器级气流，增加持续负载和多点温度记录 |
+| 满载热设计认证 | 已有 QSFP 60 秒和 DDR4-2133 60 秒短负载记录，DDR4 最高 `65.93 C`，但不能代表数小时持续满载；本轮用户选择不执行两小时压测 | 如后续要求长时资格认证，确保服务器级气流并增加持续负载和多点温度记录 |
 
 普通逻辑分析仪不适合直接观察 10.3125/12.5 Gbit/s 收发器通道。当前阶段优先使用 PLL/CDR/lock 状态、PRBS、错误计数、I2C 状态和温度完成数字诊断；只有数字配置已确认而链路仍异常时，才考虑高速示波器或误码仪。
 
@@ -179,7 +179,7 @@
 1. 每次实验前检查 JTAG ID、USB 状态、气流和当前温度。
 2. 所有工程使用 Quartus 22.1 和 `10AXF40AA` 从源文件重新编译。
 3. 先完成 LED、时钟和输入采样，再扫描 I2C。
-4. DDR4 双控制器 2 GiB/通道的全地址并发 BIST 已在 1600/2133 MT/s 通过，颗粒/地址/ECC 几何已闭环；后续做峰值带宽、长时间压力和温度遥测。
+4. DDR4 双控制器 2 GiB/通道的全地址并发 BIST 已在 1600/2133 MT/s 通过，颗粒/地址/ECC 几何、流水带宽和短时耐久已闭环；数小时压力和静态保持仅在后续需要资格认证时执行。
 5. QSFP 管理面和低风险内部回环已通过；下一步只有具备合适端点时才验证外部高速路径。
 6. 新设计先写 SRAM；写入前不保留 PCIe BAR `mmap`，写入后重新检查 JTAG。
 7. 每个构建记录错误、critical warning、时序结果、SOF SHA-256、JTAG ID、温度和硬件现象。

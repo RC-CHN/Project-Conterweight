@@ -10,6 +10,14 @@ proc gray_to_binary {gray} {
     return [expr {$binary & 0xffffffff}]
 }
 
+proc gray_to_binary64 {gray} {
+    set binary $gray
+    for {set shift 1} {$shift < 64} {set shift [expr {$shift * 2}]} {
+        set binary [expr {$binary ^ ($binary >> $shift)}]
+    }
+    return [expr {$binary & 0xffffffffffffffff}]
+}
+
 proc counter_delta {new old} {
     return [expr {($new - $old) & 0xffffffff}]
 }
@@ -36,7 +44,7 @@ proc bist_channel_status {raw base} {
 
 proc print_bist_channel {label status} {
     puts [format \
-        "%s_bist: running=%u state=%u pattern=%u passes=%u errors=%u address=0x%08x first_error=0x%08x byte_mask=0x%016x" \
+        "%s_bist: running=%u state=%u pattern=%u passes=%u errors=%u address=0x%08x first_error=0x%08x byte_mask=0x%016x write_cycles=%s read_cycles=%s" \
         $label \
         [dict get $status running] \
         [dict get $status state] \
@@ -45,17 +53,22 @@ proc print_bist_channel {label status} {
         [dict get $status errors] \
         [dict get $status address_bytes] \
         [dict get $status first_error_bytes] \
-        [dict get $status error_byte_mask]]
+        [dict get $status error_byte_mask] \
+        [dict get $status last_write_cycles] \
+        [dict get $status last_read_cycles]]
 }
 
-proc claim_ddr4_probe {} {
-    for {set attempt 0} {$attempt < 10} {incr attempt} {
+proc claim_named_probe {instance_name client_name} {
+    # jtagd can retain a just-closed ISSP lease for several polling periods
+    # after a CLI System Console exits.  Retrying for 30 seconds makes
+    # back-to-back status/bandwidth/endurance invocations deterministic.
+    for {set attempt 0} {$attempt < 30} {incr attempt} {
         foreach path [get_service_paths issp] {
-            if {[catch {set candidate [claim_service issp $path ddr4_status_reader]}]} {
+            if {[catch {set candidate [claim_service issp $path $client_name]}]} {
                 continue
             }
             set info [issp_get_instance_info $candidate]
-            if {[dict get $info instance_name] eq "DDR4"} {
+            if {[dict get $info instance_name] eq $instance_name} {
                 return [list $candidate $path]
             }
             close_service issp $candidate
@@ -63,7 +76,24 @@ proc claim_ddr4_probe {} {
         after 1000
         refresh_connections
     }
-    error "DDR4 status probe not found after 10 service refresh attempts"
+    error "$instance_name probe not found after 30 service refresh attempts"
+}
+
+proc claim_ddr4_probe {} {
+    return [claim_named_probe DDR4 ddr4_status_reader]
+}
+
+proc read_bandwidth_counters {} {
+    lassign [claim_named_probe DDRB ddr4_bandwidth_reader] service path
+    set raw [expr {[issp_read_probe_data $service]}]
+    close_service issp $service
+    after 100
+    return [dict create \
+        path $path \
+        top_write [gray_to_binary64 [field $raw 0 64]] \
+        top_read [gray_to_binary64 [field $raw 64 64]] \
+        bottom_write [gray_to_binary64 [field $raw 128 64]] \
+        bottom_read [gray_to_binary64 [field $raw 192 64]]]
 }
 
 proc set_bist_control {value} {
@@ -87,7 +117,13 @@ proc read_bist_status {} {
 
     set top [bist_channel_status $raw 107]
     set bottom [bist_channel_status $raw 292]
+    set cycles [read_bandwidth_counters]
+    dict set top last_write_cycles [dict get $cycles top_write]
+    dict set top last_read_cycles [dict get $cycles top_read]
+    dict set bottom last_write_cycles [dict get $cycles bottom_write]
+    dict set bottom last_read_cycles [dict get $cycles bottom_read]
     puts "issp_path=$path"
+    puts "bandwidth_issp_path=[dict get $cycles path]"
     puts [format "bist_control=0x%x" [field $raw 104 3]]
     print_bist_channel top $top
     print_bist_channel bottom $bottom
@@ -151,7 +187,14 @@ proc read_ddr4_status {{require_ready 1}} {
             !$top_cal_success || !$bot_cal_success)} {
         error "both EMIF channels are not ready"
     }
-    return [list $top_cal_success $bot_cal_success]
+    return [dict create \
+        top_cal_success $top_cal_success \
+        bottom_cal_success $bot_cal_success \
+        top_ecc_interrupt $top_ecc_interrupt \
+        bottom_ecc_interrupt $bot_ecc_interrupt \
+        temperature_valid $temp_valid \
+        temperature_raw $temp_raw \
+        temperature_c $temp_c]
 }
 
 refresh_connections

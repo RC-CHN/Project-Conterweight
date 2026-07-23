@@ -3,7 +3,8 @@ module ddr4_sweep_bist #(
     parameter int ADDRESS_WIDTH = 25,
     parameter int DATA_WIDTH = 512,
     parameter int BYTE_ENABLE_WIDTH = DATA_WIDTH / 8,
-    parameter int PATTERN_COUNT = 4
+    parameter int PATTERN_COUNT = 4,
+    parameter int MAX_OUTSTANDING_READS = 64
 ) (
     input  logic                         clk,
     input  logic                         reset_n,
@@ -28,25 +29,36 @@ module ddr4_sweep_bist #(
     output logic [31:0]                  error_count_gray,
     output logic [ADDRESS_WIDTH-1:0]     address_gray,
     output logic [ADDRESS_WIDTH-1:0]     first_error_address,
-    output logic [BYTE_ENABLE_WIDTH-1:0] error_byte_mask
+    output logic [BYTE_ENABLE_WIDTH-1:0] error_byte_mask,
+    output logic [63:0]                  last_write_cycles_gray,
+    output logic [63:0]                  last_read_cycles_gray
 );
 
     localparam logic [ADDRESS_WIDTH-1:0] LAST_ADDRESS = {ADDRESS_WIDTH{1'b1}};
+    localparam int OUTSTANDING_WIDTH = $clog2(MAX_OUTSTANDING_READS + 1);
 
     typedef enum logic [3:0] {
         ST_IDLE       = 4'd0,
         ST_WRITE      = 4'd1,
-        ST_READ_CMD   = 4'd2,
-        ST_READ_WAIT  = 4'd3
+        ST_READ       = 4'd2
     } state_t;
 
     state_t state;
     logic [1:0] pattern;
-    logic [ADDRESS_WIDTH-1:0] word_address;
-    logic [DATA_WIDTH-1:0] line_data;
+    logic [ADDRESS_WIDTH-1:0] write_address;
+    logic [ADDRESS_WIDTH-1:0] read_issue_address;
+    logic [ADDRESS_WIDTH-1:0] read_response_address;
+    logic [DATA_WIDTH-1:0] write_line_data;
+    logic [DATA_WIDTH-1:0] expected_line_data;
+    logic [OUTSTANDING_WIDTH-1:0] outstanding_reads;
+    logic read_issue_done;
     logic [31:0] heartbeat;
     logic [31:0] pass_count;
     logic [31:0] error_count;
+    logic [63:0] write_phase_cycles;
+    logic [63:0] read_phase_cycles;
+    logic [63:0] last_write_cycles;
+    logic [63:0] last_read_cycles;
 
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
     logic [1:0] reset_sync;
@@ -118,7 +130,9 @@ module ddr4_sweep_bist #(
     endfunction
 
     wire clear_event = clear_sync[1] & ~clear_previous;
-    wire [DATA_WIDTH-1:0] read_difference = avm_readdata ^ line_data;
+    wire read_accept = avm_read && !avm_waitrequest;
+    wire [DATA_WIDTH-1:0] read_difference =
+        avm_readdata ^ expected_line_data;
 
     // Arria 10 configuration initializes these registers before the EMIF user
     // clocks start.  Keeping the wide datapath off reset_n avoids turning the
@@ -128,11 +142,20 @@ module ddr4_sweep_bist #(
     initial begin
         state = ST_IDLE;
         pattern = '0;
-        word_address = '0;
-        line_data = initial_line(2'd0);
+        write_address = '0;
+        read_issue_address = '0;
+        read_response_address = '0;
+        write_line_data = initial_line(2'd0);
+        expected_line_data = initial_line(2'd0);
+        outstanding_reads = '0;
+        read_issue_done = 1'b0;
         heartbeat = '0;
         pass_count = '0;
         error_count = '0;
+        write_phase_cycles = '0;
+        read_phase_cycles = '0;
+        last_write_cycles = '0;
+        last_read_cycles = '0;
         first_error_address = '0;
         error_byte_mask = '0;
         reset_sync = '0;
@@ -141,18 +164,26 @@ module ddr4_sweep_bist #(
         clear_previous = 1'b0;
     end
 
-    assign avm_address = word_address;
-    assign avm_writedata = line_data;
+    assign avm_address = (state == ST_READ) ? read_issue_address : write_address;
+    assign avm_writedata = write_line_data;
     assign avm_byteenable = {BYTE_ENABLE_WIDTH{1'b1}};
     assign avm_write = (state == ST_WRITE);
-    assign avm_read = (state == ST_READ_CMD);
+    // Keep the command pipe full.  A response arriving while the outstanding
+    // window is full makes room for a replacement command in the same cycle.
+    assign avm_read = (state == ST_READ) && !read_issue_done &&
+        ((outstanding_reads < MAX_OUTSTANDING_READS) || avm_readdatavalid);
     assign running = (state != ST_IDLE);
     assign state_status = state;
     assign pattern_status = pattern;
     assign heartbeat_gray = heartbeat ^ (heartbeat >> 1);
     assign pass_count_gray = pass_count ^ (pass_count >> 1);
     assign error_count_gray = error_count ^ (error_count >> 1);
-    assign address_gray = word_address ^ (word_address >> 1);
+    assign address_gray = ((state == ST_READ) ? read_response_address : write_address) ^
+        (((state == ST_READ) ? read_response_address : write_address) >> 1);
+    assign last_write_cycles_gray =
+        last_write_cycles ^ (last_write_cycles >> 1);
+    assign last_read_cycles_gray =
+        last_read_cycles ^ (last_read_cycles >> 1);
 
     // Treat the Platform Designer reset as a local asynchronous control input
     // and synchronize it as data.  This avoids distributing the controller's
@@ -174,65 +205,100 @@ module ddr4_sweep_bist #(
             error_count <= '0;
             first_error_address <= '0;
             error_byte_mask <= '0;
+            last_write_cycles <= '0;
+            last_read_cycles <= '0;
         end
 
         if (!enable_sync[1]) begin
             state <= ST_IDLE;
             pattern <= '0;
-            word_address <= '0;
-            line_data <= initial_line(2'd0);
+            write_address <= '0;
+            read_issue_address <= '0;
+            read_response_address <= '0;
+            write_line_data <= initial_line(2'd0);
+            expected_line_data <= initial_line(2'd0);
+            outstanding_reads <= '0;
+            read_issue_done <= 1'b0;
+            write_phase_cycles <= '0;
+            read_phase_cycles <= '0;
         end else begin
             case (state)
                 ST_IDLE: begin
                     pattern <= '0;
-                    word_address <= '0;
-                    line_data <= initial_line(2'd0);
+                    write_address <= '0;
+                    read_issue_address <= '0;
+                    read_response_address <= '0;
+                    write_line_data <= initial_line(2'd0);
+                    expected_line_data <= initial_line(2'd0);
+                    outstanding_reads <= '0;
+                    read_issue_done <= 1'b0;
+                    write_phase_cycles <= '0;
+                    read_phase_cycles <= '0;
                     state <= ST_WRITE;
                 end
 
                 ST_WRITE: begin
+                    write_phase_cycles <= write_phase_cycles + 1'b1;
                     if (!avm_waitrequest) begin
-                        if (word_address == LAST_ADDRESS) begin
-                            word_address <= '0;
-                            line_data <= initial_line(pattern);
-                            state <= ST_READ_CMD;
+                        if (write_address == LAST_ADDRESS) begin
+                            read_issue_address <= '0;
+                            read_response_address <= '0;
+                            expected_line_data <= initial_line(pattern);
+                            outstanding_reads <= '0;
+                            read_issue_done <= 1'b0;
+                            state <= ST_READ;
                         end else begin
-                            word_address <= word_address + 1'b1;
-                            line_data <= next_line(line_data, pattern);
+                            write_address <= write_address + 1'b1;
+                            write_line_data <= next_line(write_line_data, pattern);
                         end
                     end
                 end
 
-                ST_READ_CMD: begin
-                    if (!avm_waitrequest)
-                        state <= ST_READ_WAIT;
-                end
+                ST_READ: begin
+                    read_phase_cycles <= read_phase_cycles + 1'b1;
 
-                ST_READ_WAIT: begin
+                    case ({read_accept, avm_readdatavalid})
+                        2'b10: outstanding_reads <= outstanding_reads + 1'b1;
+                        2'b01: outstanding_reads <= outstanding_reads - 1'b1;
+                        default: outstanding_reads <= outstanding_reads;
+                    endcase
+
+                    if (read_accept) begin
+                        if (read_issue_address == LAST_ADDRESS)
+                            read_issue_done <= 1'b1;
+                        else
+                            read_issue_address <= read_issue_address + 1'b1;
+                    end
+
                     if (avm_readdatavalid) begin
                         if (read_difference != '0) begin
                             if (error_count == 0)
-                                first_error_address <= word_address;
+                                first_error_address <= read_response_address;
                             if (error_count != 32'hffff_ffff)
                                 error_count <= error_count + 1'b1;
                             error_byte_mask <= error_byte_mask | byte_errors(read_difference);
                         end
 
-                        if (word_address == LAST_ADDRESS) begin
-                            word_address <= '0;
+                        if (read_response_address == LAST_ADDRESS) begin
+                            outstanding_reads <= '0;
+                            read_issue_done <= 1'b0;
+                            write_address <= '0;
                             if (pattern == PATTERN_COUNT - 1) begin
                                 pattern <= '0;
                                 pass_count <= pass_count + 1'b1;
-                                line_data <= initial_line(2'd0);
+                                write_line_data <= initial_line(2'd0);
+                                last_write_cycles <= write_phase_cycles;
+                                last_read_cycles <= read_phase_cycles + 1'b1;
+                                write_phase_cycles <= '0;
+                                read_phase_cycles <= '0;
                             end else begin
                                 pattern <= pattern + 1'b1;
-                                line_data <= initial_line(pattern + 1'b1);
+                                write_line_data <= initial_line(pattern + 1'b1);
                             end
                             state <= ST_WRITE;
                         end else begin
-                            word_address <= word_address + 1'b1;
-                            line_data <= next_line(line_data, pattern);
-                            state <= ST_READ_CMD;
+                            read_response_address <= read_response_address + 1'b1;
+                            expected_line_data <= next_line(expected_line_data, pattern);
                         end
                     end
                 end

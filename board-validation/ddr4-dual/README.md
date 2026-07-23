@@ -73,9 +73,10 @@ controller address range. It writes and then compares four deterministic data
 sequences: two per-lane LFSR seeds, a rotating one-hot bit, and a rotating
 one-cold bit. One pass produces 8 GiB of writes and 8 GiB of reads per channel.
 Both engines run at the same time and retain pass count, error count, first
-error address, and a 64-bit byte-error mask for JTAG inspection. This is a
-complete address/data-pattern sweep, not a peak-bandwidth benchmark: reads
-deliberately use one outstanding request so failures are easy to localize.
+error address, a 64-bit byte-error mask, and completed-phase cycle counts for
+JTAG inspection. Reads keep up to 64 commands outstanding while responses are
+still compared in address order, so the same full-address sweep also supports
+a checked sustained-bandwidth measurement.
 
 The ISSP source uses its Quartus-validated raw power-up value of 3, while the
 top-level maps that value to logical BIST control zero.  Both engines therefore

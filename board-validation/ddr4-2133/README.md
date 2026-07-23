@@ -38,7 +38,26 @@ quartus_pgm -c 1 -m jtag \
   --project_dir=. \
   --jdi=output_files/Catapult_v3_DDR4_2133.jdi \
   --script=run_sweep_bist.tcl
+
+/workspace/intelFPGA/22.1std/quartus/sopc_builder/bin/system-console \
+  --project_dir=. \
+  --jdi=output_files/Catapult_v3_DDR4_2133.jdi \
+  --script=measure_bandwidth.tcl
+
+# Optional long-duration qualification example: two hours, sampled every 30 s.
+/workspace/intelFPGA/22.1std/quartus/sopc_builder/bin/system-console \
+  --project_dir=. \
+  --jdi=output_files/Catapult_v3_DDR4_2133.jdi \
+  --script=run_endurance.tcl \
+  7200 30
 ```
+
+The traffic generator keeps up to 64 reads outstanding, compares every returned
+512-bit line in address order, and records complete-pass write/read cycle counts
+in the EMIF user-clock domains.  A pass still covers all four deterministic
+patterns over all 2 GiB per channel: 8 GiB written and 8 GiB read per channel.
+Bandwidth is calculated from completed 8 GiB phases, not from a short command
+queue fill interval.
 
 This experiment never creates a JIC and must not touch QSPI Flash.
 

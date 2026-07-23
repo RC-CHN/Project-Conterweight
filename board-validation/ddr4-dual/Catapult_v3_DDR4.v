@@ -59,6 +59,7 @@ wire bot_cal_fail;
 wire bot_pll_locked;
 wire bot_ecc_interrupt;
 wire [2:0] bist_source_raw;
+wire bandwidth_source_unused;
 // Quartus 22.1's VHDL altsource_probe implementation rejects an all-zero
 // SOURCE_INITIAL_VALUE for this instance.  Keep its known-good raw value of
 // 3, then invert the two enable bits so the logical BIST control still powers
@@ -75,6 +76,8 @@ wire [31:0] top_bist_error_count_gray;
 wire [24:0] top_bist_address_gray;
 wire [24:0] top_bist_first_error_address;
 wire [63:0] top_bist_error_byte_mask;
+wire [63:0] top_bist_last_write_cycles_gray;
+wire [63:0] top_bist_last_read_cycles_gray;
 
 wire bot_bist_running;
 wire [3:0] bot_bist_state;
@@ -85,6 +88,8 @@ wire [31:0] bot_bist_error_count_gray;
 wire [24:0] bot_bist_address_gray;
 wire [24:0] bot_bist_first_error_address;
 wire [63:0] bot_bist_error_byte_mask;
+wire [63:0] bot_bist_last_write_cycles_gray;
+wire [63:0] bot_bist_last_read_cycles_gray;
 
 wire [31:0] alive_count_gray = alive_count ^ (alive_count >> 1);
 
@@ -170,6 +175,16 @@ wire [487:0] ddr4_probe_data = {
 	alive_count_gray
 };
 
+// A second ISSP instance keeps the original 488-bit status ABI intact and
+// stays below the Quartus 22.1 per-instance maximum probe width of 511 bits.
+// Least-significant field first: top write, top read, bottom write, bottom read.
+wire [255:0] ddr4_bandwidth_probe_data = {
+	bot_bist_last_read_cycles_gray,
+	bot_bist_last_write_cycles_gray,
+	top_bist_last_read_cycles_gray,
+	top_bist_last_write_cycles_gray
+};
+
 assign leds[6] = top_bist_heartbeat_gray[27];
 assign leds[7] = bot_bist_heartbeat_gray[27];
 assign leds[8] = alive_count[25];
@@ -204,6 +219,21 @@ altsource_probe #(
 	.source_ena(1'b1)
 );
 
+altsource_probe #(
+	.sld_auto_instance_index("YES"),
+	.sld_instance_index(0),
+	.instance_id("DDRB"),
+	.probe_width(256),
+	.source_width(1),
+	.source_initial_value("1"),
+	.enable_metastability("YES")
+) ddr4_bandwidth_probe (
+	.probe(ddr4_bandwidth_probe_data),
+	.source(bandwidth_source_unused),
+	.source_clk(clk_u59),
+	.source_ena(1'b0)
+);
+
 initial begin
 	alive_count = 0;
 	temp_eoc_meta = 1'b0;
@@ -227,6 +257,8 @@ end
 		.bist_top_status_address_gray (top_bist_address_gray),
 		.bist_top_status_first_error_address (top_bist_first_error_address),
 		.bist_top_status_error_byte_mask (top_bist_error_byte_mask),
+		.bist_top_status_last_write_cycles_gray (top_bist_last_write_cycles_gray),
+		.bist_top_status_last_read_cycles_gray (top_bist_last_read_cycles_gray),
 
 		.bist_bot_control_enable (bist_control[1]),
 		.bist_bot_control_clear  (bist_control[2]),
@@ -239,6 +271,8 @@ end
 		.bist_bot_status_address_gray (bot_bist_address_gray),
 		.bist_bot_status_first_error_address (bot_bist_first_error_address),
 		.bist_bot_status_error_byte_mask (bot_bist_error_byte_mask),
+		.bist_bot_status_last_write_cycles_gray (bot_bist_last_write_cycles_gray),
+		.bist_bot_status_last_read_cycles_gray (bot_bist_last_read_cycles_gray),
 
 		// --------CLOCKS
 		.clk_100_clk            (clk_u59),            	  //    clk_100.clk

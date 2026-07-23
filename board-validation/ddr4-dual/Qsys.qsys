@@ -180,6 +180,7 @@
   <parameter name="BYTE_ENABLE_WIDTH" value="64" />
   <parameter name="CHANNEL_ID" value="1" />
   <parameter name="DATA_WIDTH" value="512" />
+  <parameter name="MAX_OUTSTANDING_READS" value="64" />
   <parameter name="PATTERN_COUNT" value="4" />
  </module>
  <module name="bist_top" kind="ddr4_sweep_bist" version="1.0" enabled="1">
@@ -187,6 +188,7 @@
   <parameter name="BYTE_ENABLE_WIDTH" value="64" />
   <parameter name="CHANNEL_ID" value="0" />
   <parameter name="DATA_WIDTH" value="512" />
+  <parameter name="MAX_OUTSTANDING_READS" value="64" />
   <parameter name="PATTERN_COUNT" value="4" />
  </module>
  <module name="clk_100" kind="clock_source" version="22.1" enabled="1">

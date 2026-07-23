@@ -20,6 +20,8 @@ add_parameter BYTE_ENABLE_WIDTH INTEGER 64
 set_parameter_property BYTE_ENABLE_WIDTH HDL_PARAMETER true
 add_parameter PATTERN_COUNT INTEGER 4
 set_parameter_property PATTERN_COUNT HDL_PARAMETER true
+add_parameter MAX_OUTSTANDING_READS INTEGER 64
+set_parameter_property MAX_OUTSTANDING_READS HDL_PARAMETER true
 
 add_fileset quartus_synth QUARTUS_SYNTH synth_callback
 set_fileset_property quartus_synth TOP_LEVEL ddr4_sweep_bist
@@ -49,7 +51,7 @@ set_interface_property avm burstOnBurstBoundariesOnly false
 set_interface_property avm doStreamReads false
 set_interface_property avm doStreamWrites false
 set_interface_property avm linewrapBursts false
-set_interface_property avm maximumPendingReadTransactions 1
+set_interface_property avm maximumPendingReadTransactions 64
 set_interface_property avm maximumPendingWriteTransactions 0
 set_interface_property avm readLatency 0
 add_interface_port avm avm_address address Output ADDRESS_WIDTH
@@ -71,3 +73,5 @@ add_interface_port status error_count_gray error_count_gray Output 32
 add_interface_port status address_gray address_gray Output ADDRESS_WIDTH
 add_interface_port status first_error_address first_error_address Output ADDRESS_WIDTH
 add_interface_port status error_byte_mask error_byte_mask Output BYTE_ENABLE_WIDTH
+add_interface_port status last_write_cycles_gray last_write_cycles_gray Output 64
+add_interface_port status last_read_cycles_gray last_read_cycles_gray Output 64

@@ -31,17 +31,18 @@ writeback and polls header DW3.
 ## BAR4: application window
 
 The 1 MiB DMA buffer occupies `0x000000` through `0x0fffff`. Diagnostic
-registers start at `0x100000`; each PIO has a 16-byte Platform Designer span.
+registers start at `0x100000` in one custom Avalon-MM slave clocked directly by
+the 250 MHz HIP application clock.
 
 | Offset | Access | Meaning |
 | ---: | :---: | --- |
 | `0x100000` | RO | design ID `0x43444d41` (`CDMA`) |
-| `0x100010` | RO | ABI version `0x00010000` |
-| `0x100020` | RO | PCIe core-clock heartbeat |
-| `0x100030` | RO | capabilities |
-| `0x100040` | RO | observed PERST deassert count |
-| `0x100050` | RO | runtime PERST assertion/error count |
-| `0x100060` | RW | scratch register |
+| `0x100004` | RO | ABI version `0x00010000` |
+| `0x100008` | RO | PCIe core-clock heartbeat |
+| `0x10000c` | RO | capabilities |
+| `0x100010` | RO | observed PERST deassert count |
+| `0x100014` | RO | runtime PERST assertion/error count |
+| `0x100018` | RW | scratch register |
 
 Capabilities:
 
@@ -50,4 +51,3 @@ Capabilities:
 - bit 2: EPLAST completion polling
 - bit 3: BAR4 aperture also exposes the on-chip buffer
 - bits 23:16: log2 of on-chip buffer bytes (`20`)
-

@@ -25,6 +25,7 @@
 
 # Platform Designer generated HDL. Recreate it from the tracked .qsys and Tcl.
 **/i2c_bridge/
+pcie-dma/dma_system/
 
 # QSFP fixed-rate transceiver IP generated from the tracked .qsys files.
 qsfp-superlite/fpll/

@@ -9,51 +9,11 @@
    categories="" />
  <parameter name="bonusData"><![CDATA[bonusData 
 {
-   element abi_version
-   {
-      datum _sortIndex
-      {
-         value = "3";
-         type = "int";
-      }
-   }
-   element capabilities
-   {
-      datum _sortIndex
-      {
-         value = "5";
-         type = "int";
-      }
-   }
-   element design_id
-   {
-      datum _sortIndex
-      {
-         value = "2";
-         type = "int";
-      }
-   }
    element dma_buffer
    {
       datum _sortIndex
       {
          value = "1";
-         type = "int";
-      }
-   }
-   element error_count
-   {
-      datum _sortIndex
-      {
-         value = "7";
-         type = "int";
-      }
-   }
-   element heartbeat
-   {
-      datum _sortIndex
-      {
-         value = "4";
          type = "int";
       }
    }
@@ -65,19 +25,11 @@
          type = "int";
       }
    }
-   element reset_count
+   element status
    {
       datum _sortIndex
       {
-         value = "6";
-         type = "int";
-      }
-   }
-   element scratch
-   {
-      datum _sortIndex
-      {
-         value = "8";
+         value = "2";
          type = "int";
       }
    }
@@ -103,107 +55,14 @@
  <parameter name="useTestBenchNamingPattern" value="false" />
  <instanceScript></instanceScript>
  <interface
-   name="abi_version_external_connection"
-   internal="abi_version.external_connection"
-   type="conduit"
-   dir="end" />
- <interface
-   name="app_reset"
-   internal="hip.app_nreset_status"
-   type="reset"
-   dir="start" />
- <interface
-   name="capabilities_external_connection"
-   internal="capabilities.external_connection"
-   type="conduit"
-   dir="end" />
- <interface
-   name="core_clk"
-   internal="hip.coreclkout_hip"
-   type="clock"
-   dir="start" />
- <interface
-   name="design_id_external_connection"
-   internal="design_id.external_connection"
-   type="conduit"
-   dir="end" />
- <interface
-   name="error_count_external_connection"
-   internal="error_count.external_connection"
-   type="conduit"
-   dir="end" />
- <interface
-   name="heartbeat_external_connection"
-   internal="heartbeat.external_connection"
-   type="conduit"
-   dir="end" />
- <interface
    name="hip_hip_serial"
    internal="hip.hip_serial"
    type="conduit"
    dir="end" />
  <interface name="hip_npor" internal="hip.npor" type="conduit" dir="end" />
  <interface name="hip_refclk" internal="hip.refclk" type="clock" dir="end" />
- <interface
-   name="reset_count_external_connection"
-   internal="reset_count.external_connection"
-   type="conduit"
-   dir="end" />
- <interface
-   name="scratch_external_connection"
-   internal="scratch.external_connection"
-   type="conduit"
-   dir="end" />
- <module
-   name="abi_version"
-   kind="altera_avalon_pio"
-   version="22.1"
-   enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="250000000" />
-  <parameter name="direction" value="Input" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="32" />
- </module>
- <module
-   name="capabilities"
-   kind="altera_avalon_pio"
-   version="22.1"
-   enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="250000000" />
-  <parameter name="direction" value="Input" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="32" />
- </module>
- <module name="design_id" kind="altera_avalon_pio" version="22.1" enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="250000000" />
-  <parameter name="direction" value="Input" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="32" />
- </module>
+ <interface name="status_leds" internal="status.leds" type="conduit" dir="end" />
+ <interface name="status_perst" internal="status.perst" type="conduit" dir="end" />
  <module
    name="dma_buffer"
    kind="altera_avalon_onchip_memory2"
@@ -226,7 +85,7 @@
   <parameter name="instanceID" value="NONE" />
   <parameter name="memorySize" value="1048576" />
   <parameter name="readDuringWriteMode" value="DONT_CARE" />
-  <parameter name="resetrequest_enabled" value="true" />
+  <parameter name="resetrequest_enabled" value="false" />
   <parameter name="simAllowMRAMContentsFile" value="false" />
   <parameter name="simMemInitOnlyFilename" value="0" />
   <parameter name="singleClockOperation" value="false" />
@@ -235,38 +94,6 @@
   <parameter name="useNonDefaultInitFile" value="false" />
   <parameter name="useShallowMemBlocks" value="false" />
   <parameter name="writable" value="true" />
- </module>
- <module
-   name="error_count"
-   kind="altera_avalon_pio"
-   version="22.1"
-   enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="250000000" />
-  <parameter name="direction" value="Input" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="32" />
- </module>
- <module name="heartbeat" kind="altera_avalon_pio" version="22.1" enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="250000000" />
-  <parameter name="direction" value="Input" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="32" />
  </module>
  <module name="hip" kind="altera_pcie_a10_hip" version="22.1" enabled="1">
   <parameter name="AUTO_RXM_IRQ_INTERRUPTS_USED" value="-1" />
@@ -1072,7 +899,7 @@
   <parameter name="rx_buffer_credit_alloc_hwtcl" value="Low" />
   <parameter name="rx_cred_ctl_param_hwtcl" value="0" />
   <parameter name="rx_polinv_soft_logic_enable" value="0" />
-  <parameter name="select_design_example_hwtcl" value="PIO" />
+  <parameter name="select_design_example_hwtcl" value="DMA" />
   <parameter name="select_design_example_rtl_lang_hwtcl" value="Verilog" />
   <parameter name="serial_sim_hwtcl" value="1" />
   <parameter name="slave_address_map_0_hwtcl" value="0" />
@@ -1121,38 +948,7 @@
   <parameter name="wrala_hwtcl" value="0" />
   <parameter name="xcvr_reconfig_hwtcl" value="0" />
  </module>
- <module
-   name="reset_count"
-   kind="altera_avalon_pio"
-   version="22.1"
-   enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="250000000" />
-  <parameter name="direction" value="Input" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="32" />
- </module>
- <module name="scratch" kind="altera_avalon_pio" version="22.1" enabled="1">
-  <parameter name="bitClearingEdgeCapReg" value="false" />
-  <parameter name="bitModifyingOutReg" value="false" />
-  <parameter name="captureEdge" value="false" />
-  <parameter name="clockRate" value="250000000" />
-  <parameter name="direction" value="Output" />
-  <parameter name="edgeType" value="RISING" />
-  <parameter name="generateIRQ" value="false" />
-  <parameter name="irqType" value="LEVEL" />
-  <parameter name="resetValue" value="0" />
-  <parameter name="simDoTestBenchWiring" value="false" />
-  <parameter name="simDrivenValue" value="0" />
-  <parameter name="width" value="32" />
- </module>
+ <module name="status" kind="dma_status_regs" version="1.0" enabled="1" />
  <connection
    kind="avalon"
    version="22.1"
@@ -1194,60 +990,14 @@
   <parameter name="baseAddress" value="0x0000" />
   <parameter name="defaultConnection" value="false" />
  </connection>
- <connection kind="avalon" version="22.1" start="hip.rxm_bar4" end="dma_buffer.s1">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x0000" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection kind="avalon" version="22.1" start="hip.rxm_bar4" end="design_id.s1">
+ <connection kind="avalon" version="22.1" start="hip.rxm_bar4" end="status.s0">
   <parameter name="arbitrationPriority" value="1" />
   <parameter name="baseAddress" value="0x00100000" />
   <parameter name="defaultConnection" value="false" />
  </connection>
- <connection
-   kind="avalon"
-   version="22.1"
-   start="hip.rxm_bar4"
-   end="abi_version.s1">
+ <connection kind="avalon" version="22.1" start="hip.rxm_bar4" end="dma_buffer.s1">
   <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00100010" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection kind="avalon" version="22.1" start="hip.rxm_bar4" end="heartbeat.s1">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00100020" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection
-   kind="avalon"
-   version="22.1"
-   start="hip.rxm_bar4"
-   end="capabilities.s1">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00100030" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection
-   kind="avalon"
-   version="22.1"
-   start="hip.rxm_bar4"
-   end="reset_count.s1">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00100040" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection
-   kind="avalon"
-   version="22.1"
-   start="hip.rxm_bar4"
-   end="error_count.s1">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00100050" />
-  <parameter name="defaultConnection" value="false" />
- </connection>
- <connection kind="avalon" version="22.1" start="hip.rxm_bar4" end="scratch.s1">
-  <parameter name="arbitrationPriority" value="1" />
-  <parameter name="baseAddress" value="0x00100060" />
+  <parameter name="baseAddress" value="0x0000" />
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection kind="avalon" version="22.1" start="hip.wr_dcm_master" end="hip.txs">
@@ -1259,41 +1009,6 @@
    kind="clock"
    version="22.1"
    start="hip.coreclkout_hip"
-   end="design_id.clk" />
- <connection
-   kind="clock"
-   version="22.1"
-   start="hip.coreclkout_hip"
-   end="abi_version.clk" />
- <connection
-   kind="clock"
-   version="22.1"
-   start="hip.coreclkout_hip"
-   end="heartbeat.clk" />
- <connection
-   kind="clock"
-   version="22.1"
-   start="hip.coreclkout_hip"
-   end="capabilities.clk" />
- <connection
-   kind="clock"
-   version="22.1"
-   start="hip.coreclkout_hip"
-   end="reset_count.clk" />
- <connection
-   kind="clock"
-   version="22.1"
-   start="hip.coreclkout_hip"
-   end="error_count.clk" />
- <connection
-   kind="clock"
-   version="22.1"
-   start="hip.coreclkout_hip"
-   end="scratch.clk" />
- <connection
-   kind="clock"
-   version="22.1"
-   start="hip.coreclkout_hip"
    end="dma_buffer.clk1" />
  <connection
    kind="clock"
@@ -1301,40 +1016,15 @@
    start="hip.coreclkout_hip"
    end="dma_buffer.clk2" />
  <connection
-   kind="reset"
+   kind="clock"
    version="22.1"
-   start="hip.app_nreset_status"
-   end="design_id.reset" />
+   start="hip.coreclkout_hip"
+   end="status.clock" />
  <connection
    kind="reset"
    version="22.1"
    start="hip.app_nreset_status"
-   end="abi_version.reset" />
- <connection
-   kind="reset"
-   version="22.1"
-   start="hip.app_nreset_status"
-   end="heartbeat.reset" />
- <connection
-   kind="reset"
-   version="22.1"
-   start="hip.app_nreset_status"
-   end="capabilities.reset" />
- <connection
-   kind="reset"
-   version="22.1"
-   start="hip.app_nreset_status"
-   end="reset_count.reset" />
- <connection
-   kind="reset"
-   version="22.1"
-   start="hip.app_nreset_status"
-   end="error_count.reset" />
- <connection
-   kind="reset"
-   version="22.1"
-   start="hip.app_nreset_status"
-   end="scratch.reset" />
+   end="status.reset" />
  <connection
    kind="reset"
    version="22.1"

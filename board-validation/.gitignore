@@ -12,6 +12,17 @@
 **/*_assignment_defaults.qdf
 **/Qsys/
 
+# Out-of-tree Linux kernel module products.
+**/*.ko
+**/*.o
+**/*.mod
+**/*.mod.c
+**/*.mod.o
+**/*.order
+**/*.symvers
+**/.*.cmd
+**/.tmp_versions/
+
 # Platform Designer generated HDL. Recreate it from the tracked .qsys and Tcl.
 **/i2c_bridge/
 

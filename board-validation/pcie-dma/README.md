@@ -48,6 +48,26 @@ ignored by Git. The generated `dma_system.qsys` remains tracked together with
 `generate_system.tcl` so that the exact IP configuration is reviewable and
 reproducible.
 
+## Host test
+
+After the SRAM image is loaded and the host has rebooted, the endpoint should
+enumerate as `1172:e004`. Load the validation driver and run a closed-loop
+transfer from its PCI sysfs directory:
+
+```bash
+sudo insmod driver/catapult_dma.ko
+device=/sys/bus/pci/devices/0000:6a:00.0
+cat "$device/catapult_dma/info"
+echo "131072 10" | sudo tee "$device/catapult_dma/run"
+cat "$device/catapult_dma/result"
+sudo rmmod catapult_dma
+```
+
+Replace the BDF if enumeration assigns a different address. The `run` input is
+`<bytes> <loops>`; the byte count must be four-byte aligned and no greater than
+262140 in milestone 1. A passing result reports separately measured
+host-to-FPGA and FPGA-to-host MB/s and `total_errors=0`.
+
 ## Hardware-test boundary
 
 The new SOF must first be loaded into volatile SRAM. Reconfiguring the FPGA
@@ -57,4 +77,3 @@ This project does not write QSPI Flash.
 
 Hardware results, artifact hashes, warning review, timing closure, negotiated
 link width/speed, temperature, and DMA measurements belong in `RESULTS.md`.
-

@@ -221,3 +221,31 @@ endpoint can train during host boot even if reboot removes PCIe slot power.
 Before that write, the existing board-2 full backup, second-disk copy, detected
 `MT25QU01G` geometry, rollback image, and SRAM configuration must be
 re-verified.
+
+## Flash image preparation
+
+Date: 2026-07-23 16:32 (Asia/Shanghai)
+
+The JIC was generated without accessing hardware:
+
+```text
+quartus_cpf -c -d MT25QU01G -s 10AXF40AA \
+  output_files/pcie_dma.sof output_files/pcie_dma-MT25QU01G.jic
+```
+
+- conversion result: successful, 0 errors, 0 warnings
+- JIC size: `134,217,964` bytes
+- JIC SHA-256:
+  `1641d9a26c8ffd7439505689f7b6fd7e57d40f58d3797f41fd87fd8c175044ab`
+- exact source SOF SHA-256:
+  `e68834a88b31621562d6edf00996211e10fdaee0cb4292cba9ea7398806e87e9`
+- configuration device: `MT25QU01G`
+- SFL device target: `10AXF40AA`
+
+Immediately before programming, both read-only copies of the board-2 original
+Flash backup were checked byte-for-byte identical. Each is `134,218,006` bytes
+with SHA-256
+`77537b66db42e28aff0e354b1051f1f08ff20780e214167d4aa101634ec01d14`.
+The previously cold-boot-validated `pcie_temp_demo-MT25QU01G.jic` rollback
+image is also present with SHA-256
+`7dfe7ecfdfd9749d2dfd87dc1d25d62af24cf0b5b5bf1d79dd71c2897c9b0cba`.

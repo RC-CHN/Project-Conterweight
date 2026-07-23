@@ -1,7 +1,8 @@
 # PCIe DMA validation results
 
-Status: build, post-fit timing, and SRAM configuration passed; cold PCIe
-enumeration and DMA hardware tests are pending a host reboot.
+Status: Gen3 build, post-fit timing, and SRAM configuration passed, but the
+endpoint did not enumerate after a host reboot. DMA hardware tests are blocked
+until a link-capable image is loaded and the host is rebooted again.
 
 ## Build evidence
 
@@ -69,7 +70,28 @@ Date: 2026-07-23 12:38–12:39 (Asia/Shanghai)
 - no post-load USB, JTAG, PCIe AER, disconnect, or reset error was logged
 
 As expected on this host, Linux did not hot-enumerate `1172:e004` after FPGA
-reconfiguration. A host reboot is required before the BAR and DMA tests.
+reconfiguration. A host reboot was required before the BAR and DMA tests.
+
+## First cold-enumeration result
+
+Date: 2026-07-23 12:51 onward (Asia/Shanghai)
+
+- the host rebooted while the SRAM image remained loaded
+- JTAG still enumerated as `02E060DD 10AT115S(1|2)`
+- the FT232H programmer still enumerated at USB high speed
+- neither `1172:e004` nor another `1172:*` endpoint appeared in the complete
+  PCIe topology
+- the previous `0000:6a:00.0` BDF was reassigned to an ASMedia USB controller;
+  BDFs are therefore not stable identifiers across this missing endpoint
+- no relevant PCIe AER or link error was logged
+
+The reset wiring, lane pins, reference-clock pin, PERST pin, and generated
+terminations for the optional HIP control/PIPE conduits match the locally
+working BAR prototype. The material link-layer difference is that this image is
+the first local Gen3 x8 / 256-bit build, while the working prototype resolves
+to Gen2 x8 / 128-bit. Warning 18708 also exists only because Gen3 requires the
+ATX PLL. The next isolation image will keep the DMA subsystem and PCI identity
+but use the previously proven Gen2 x8 PHY mode.
 
 ## Warning review
 
@@ -96,7 +118,7 @@ reconfiguration. A host reboot is required before the BAR and DMA tests.
 - [x] setup, hold, recovery/removal, pulse-width, and unconstrained-path reports
 - [x] generated SOF target, size, and SHA-256
 - [x] JTAG ID before and after SRAM programming
-- cold host enumeration as `1172:e004`
+- [ ] cold host enumeration as `1172:e004` (failed for first Gen3 image)
 - negotiated PCIe speed and width from `lspci -vv`
 - BAR0/BAR4 sizes and design ABI register readback
 - host-to-device, device-to-host, and closed-loop comparison results

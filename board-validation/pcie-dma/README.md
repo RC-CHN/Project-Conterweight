@@ -77,8 +77,13 @@ host-to-FPGA and FPGA-to-host MB/s and `total_errors=0`.
 
 The new SOF must first be loaded into volatile SRAM. Reconfiguring the FPGA
 removes the active PCIe endpoint, and this host has not reliably recovered it
-with a PCIe rescan, so a host reboot is expected before running the driver.
-This project does not write QSPI Flash.
+with a PCIe rescan. After that SRAM configuration check, the explicitly
+authorized cold-boot test writes a JIC generated for the board's detected
+`MT25QU01G` QSPI device, using the already validated standalone SFL bridge.
+The board-specific original Flash backup and its second-disk copy must be
+verified before programming. A host reboot is then required before running the
+driver; loading a SOF into SRAM alone is not a PCIe enumeration test on this
+platform.
 
 Hardware results, artifact hashes, warning review, timing closure, negotiated
 link width/speed, temperature, and DMA measurements belong in `RESULTS.md`.

@@ -17,7 +17,7 @@ validated DDR4 controllers.
 ## Fixed interface
 
 - FPGA PCIe interface: first x8 interface only
-- Link capability: PCIe Gen3 x8
+- Link capability for the DMA bring-up image: PCIe Gen2 x8
 - PCI ID: `1172:e004`
 - BAR0: Intel internal chained-DMA descriptor controller
 - BAR4: 2 MiB application window
@@ -25,9 +25,12 @@ validated DDR4 controllers.
 - Completion method in milestone 1: EPLAST status writeback polling
 - FPGA target used by the Quartus project: `10AXF40AA`
 
-Platform Designer cannot configure the Gen3 x8 / 256-bit HIP variant when its
-catalog context uses the non-production `10AXF40AA` alias. The generation
-script therefore uses `10AX115N4F40E3SG` only as the IP catalog's part-trait
+The first DMA image used Gen3 x8 / 256-bit and compiled, met timing, and loaded
+into SRAM, but it did not enumerate after reboot. The current bring-up image
+uses the Gen2 x8 / 128-bit PHY mode already proven by the BAR/temperature
+design, isolating DMA correctness from the unresolved Gen3 link issue.
+
+Platform Designer uses `10AX115N4F40E3SG` only as the IP catalog's part-trait
 context, matching the already working PCIe prototype. The Quartus QSF remains
 authoritative and compiles the complete design for `10AXF40AA`; the generated
 SOF target must be checked before any SRAM load.

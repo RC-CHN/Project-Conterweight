@@ -43,7 +43,7 @@ set_instance_assignment -name IO_STANDARD LVDS -to pcie1_refclk
 set_location_assignment PIN_AW16 -to pcie1_perstn
 set_instance_assignment -name IO_STANDARD "1.8 V" -to pcie1_perstn
 
-# PCIe interface 1, Gen3 x8 hard-IP lanes.
+# PCIe interface 1, Gen2 x8 hard-IP lanes.
 set_location_assignment PIN_AN33 -to pcie1_rx[0]
 set_location_assignment PIN_AN32 -to "pcie1_rx[0](n)"
 set_location_assignment PIN_AM31 -to pcie1_rx[1]

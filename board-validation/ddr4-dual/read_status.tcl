@@ -14,6 +14,10 @@ proc counter_delta {new old} {
     return [expr {($new - $old) & 0xffffffff}]
 }
 
+proc temperature_c {raw} {
+    return [expr {693.0 * [field $raw 478 10] / 1024.0 - 265.0}]
+}
+
 proc bist_channel_status {raw base} {
     set address_words [gray_to_binary [field $raw [expr {$base + 71}] 25]]
     set first_error_words [field $raw [expr {$base + 96}] 25]
@@ -67,7 +71,10 @@ proc set_bist_control {value} {
         error "BIST control must fit in three bits"
     }
     lassign [claim_ddr4_probe] service path
-    issp_write_source_data $service [format 0x%x $value]
+    # The RTL maps the known-good raw ISSP power-up value 3 to logical zero,
+    # keeping both BIST engines stopped until this script authorizes traffic.
+    set raw_value [expr {$value ^ 3}]
+    issp_write_source_data $service [format 0x%x $raw_value]
     close_service issp $service
     after 100
     return $path
@@ -113,6 +120,9 @@ proc read_ddr4_status {{require_ready 1}} {
     set bot_pll_locked [field $raw1 101 1]
     set top_ecc_interrupt [field $raw1 102 1]
     set bot_ecc_interrupt [field $raw1 103 1]
+    set temp_valid [field $raw1 477 1]
+    set temp_raw [field $raw1 478 10]
+    set temp_c [temperature_c $raw1]
 
     puts "issp_path=$path"
     puts [format "heartbeat_delta: u59=%u top=%u bottom=%u" \
@@ -121,6 +131,8 @@ proc read_ddr4_status {{require_ready 1}} {
         $top_pll_locked $top_cal_success $top_cal_fail $top_ecc_interrupt]
     puts [format "bottom: pll_locked=%u cal_success=%u cal_fail=%u ecc_interrupt=%u" \
         $bot_pll_locked $bot_cal_success $bot_cal_fail $bot_ecc_interrupt]
+    puts [format "temperature: valid=%u raw=%u c=%.2f" \
+        $temp_valid $temp_raw $temp_c]
 
     if {$u59_delta == 0 || $top_delta == 0 || $bot_delta == 0} {
         error "one or more management/EMIF clocks did not advance"
@@ -130,6 +142,10 @@ proc read_ddr4_status {{require_ready 1}} {
     }
     if {$top_ecc_interrupt || $bot_ecc_interrupt} {
         error "one or more ECC interrupt flags are asserted"
+    }
+    if {!$temp_valid || $temp_c >= 90.0} {
+        error [format "temperature gate failed: valid=%u temp_c=%.2f" \
+            $temp_valid $temp_c]
     }
     if {$require_ready && (!$top_pll_locked || !$bot_pll_locked ||
             !$top_cal_success || !$bot_cal_success)} {

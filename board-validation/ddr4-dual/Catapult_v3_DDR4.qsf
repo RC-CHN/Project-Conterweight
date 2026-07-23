@@ -69,6 +69,7 @@ set_location_assignment PIN_J3 -to clk_y4
 set_global_assignment -name QSYS_FILE Qsys.qsys
 set_global_assignment -name IP_SEARCH_PATHS ip/**/*
 set_global_assignment -name VERILOG_FILE Catapult_v3_DDR4.v
+set_global_assignment -name VERILOG_FILE /workspace/intelFPGA/22.1std/ip/altera/altera_temp_sense/altera_temp_sense.v
 set_location_assignment PIN_AN3 -to emif_bot_mem_mem_a[0]
 set_location_assignment PIN_AM4 -to emif_bot_mem_mem_a[1]
 set_location_assignment PIN_AL3 -to emif_bot_mem_mem_a[2]

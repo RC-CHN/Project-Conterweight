@@ -77,12 +77,12 @@ error address, and a 64-bit byte-error mask for JTAG inspection. This is a
 complete address/data-pattern sweep, not a peak-bandwidth benchmark: reads
 deliberately use one outstanding request so failures are easy to localize.
 
-The ISSP source defaults to enabling both BIST engines after configuration, so
-the design begins overwriting DDR as soon as calibration/reset release permits.
-`run_sweep_bist.tcl` stops, clears, and restarts both engines together to obtain
-a controlled measurement. `test_ddr4.tcl` stops the BIST before using the two
-JTAG-to-Avalon masters; it remains a useful sampled cross-check at seven
-addresses per channel.
+The ISSP source uses its Quartus-validated raw power-up value of 3, while the
+top-level maps that value to logical BIST control zero.  Both engines therefore
+remain stopped after configuration. `run_sweep_bist.tcl` stops, clears, and
+starts both engines together only after the status/temperature gate passes.
+`test_ddr4.tcl` stops the BIST before using the two JTAG-to-Avalon masters; it
+remains a useful sampled cross-check at seven addresses per channel.
 
 The accepted local build and hardware evidence are recorded in `RESULTS.md`.
 

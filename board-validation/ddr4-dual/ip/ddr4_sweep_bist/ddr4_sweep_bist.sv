@@ -19,7 +19,6 @@ module ddr4_sweep_bist #(
     input  logic                         avm_waitrequest,
     input  logic                         avm_readdatavalid,
     output logic [BYTE_ENABLE_WIDTH-1:0] avm_byteenable,
-    output logic [6:0]                   avm_burstcount,
 
     output logic                         running,
     output logic [3:0]                   state_status,
@@ -49,6 +48,8 @@ module ddr4_sweep_bist #(
     logic [31:0] pass_count;
     logic [31:0] error_count;
 
+    (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+    logic [1:0] reset_sync;
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
     logic [1:0] enable_sync;
     (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
@@ -119,10 +120,30 @@ module ddr4_sweep_bist #(
     wire clear_event = clear_sync[1] & ~clear_previous;
     wire [DATA_WIDTH-1:0] read_difference = avm_readdata ^ line_data;
 
+    // Arria 10 configuration initializes these registers before the EMIF user
+    // clocks start.  Keeping the wide datapath off reset_n avoids turning the
+    // synchronized reset release into a 512-bit high-fanout timing path.  The
+    // small control synchronizer below still forces the engine back to IDLE
+    // after any runtime reset, and the host pulses clear before every sweep.
+    initial begin
+        state = ST_IDLE;
+        pattern = '0;
+        word_address = '0;
+        line_data = initial_line(2'd0);
+        heartbeat = '0;
+        pass_count = '0;
+        error_count = '0;
+        first_error_address = '0;
+        error_byte_mask = '0;
+        reset_sync = '0;
+        enable_sync = '0;
+        clear_sync = '0;
+        clear_previous = 1'b0;
+    end
+
     assign avm_address = word_address;
     assign avm_writedata = line_data;
     assign avm_byteenable = {BYTE_ENABLE_WIDTH{1'b1}};
-    assign avm_burstcount = 7'd1;
     assign avm_write = (state == ST_WRITE);
     assign avm_read = (state == ST_READ_CMD);
     assign running = (state != ST_IDLE);
@@ -133,103 +154,91 @@ module ddr4_sweep_bist #(
     assign error_count_gray = error_count ^ (error_count >> 1);
     assign address_gray = word_address ^ (word_address >> 1);
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            enable_sync <= '0;
-            clear_sync <= '0;
-            clear_previous <= 1'b0;
-        end else begin
-            enable_sync <= {enable_sync[0], enable_async};
-            clear_sync <= {clear_sync[0], clear_async};
-            clear_previous <= clear_sync[1];
-        end
+    // Treat the Platform Designer reset as a local asynchronous control input
+    // and synchronize it as data.  This avoids distributing the controller's
+    // reset output as a high-fanout synchronous-reset path at 266.7 MHz.  A
+    // reset suppresses enable after the short local synchronization pipeline;
+    // the datapath then returns to IDLE through the ordinary clocked logic.
+    always_ff @(posedge clk) begin
+        reset_sync <= {reset_sync[0], reset_n};
+        enable_sync <= {enable_sync[0], enable_async & reset_sync[1]};
+        clear_sync <= {clear_sync[0], clear_async};
+        clear_previous <= clear_sync[1];
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            state <= ST_IDLE;
-            pattern <= '0;
-            word_address <= '0;
-            line_data <= '0;
-            heartbeat <= '0;
+    always_ff @(posedge clk) begin
+        heartbeat <= heartbeat + 1'b1;
+
+        if (clear_event) begin
             pass_count <= '0;
             error_count <= '0;
             first_error_address <= '0;
             error_byte_mask <= '0;
+        end
+
+        if (!enable_sync[1]) begin
+            state <= ST_IDLE;
+            pattern <= '0;
+            word_address <= '0;
+            line_data <= initial_line(2'd0);
         end else begin
-            heartbeat <= heartbeat + 1'b1;
+            case (state)
+                ST_IDLE: begin
+                    pattern <= '0;
+                    word_address <= '0;
+                    line_data <= initial_line(2'd0);
+                    state <= ST_WRITE;
+                end
 
-            if (clear_event) begin
-                pass_count <= '0;
-                error_count <= '0;
-                first_error_address <= '0;
-                error_byte_mask <= '0;
-            end
-
-            if (!enable_sync[1]) begin
-                state <= ST_IDLE;
-                pattern <= '0;
-                word_address <= '0;
-                line_data <= initial_line(2'd0);
-            end else begin
-                case (state)
-                    ST_IDLE: begin
-                        pattern <= '0;
-                        word_address <= '0;
-                        line_data <= initial_line(2'd0);
-                        state <= ST_WRITE;
-                    end
-
-                    ST_WRITE: begin
-                        if (!avm_waitrequest) begin
-                            if (word_address == LAST_ADDRESS) begin
-                                word_address <= '0;
-                                line_data <= initial_line(pattern);
-                                state <= ST_READ_CMD;
-                            end else begin
-                                word_address <= word_address + 1'b1;
-                                line_data <= next_line(line_data, pattern);
-                            end
+                ST_WRITE: begin
+                    if (!avm_waitrequest) begin
+                        if (word_address == LAST_ADDRESS) begin
+                            word_address <= '0;
+                            line_data <= initial_line(pattern);
+                            state <= ST_READ_CMD;
+                        end else begin
+                            word_address <= word_address + 1'b1;
+                            line_data <= next_line(line_data, pattern);
                         end
                     end
+                end
 
-                    ST_READ_CMD: begin
-                        if (!avm_waitrequest)
-                            state <= ST_READ_WAIT;
-                    end
+                ST_READ_CMD: begin
+                    if (!avm_waitrequest)
+                        state <= ST_READ_WAIT;
+                end
 
-                    ST_READ_WAIT: begin
-                        if (avm_readdatavalid) begin
-                            if (read_difference != '0) begin
-                                if (error_count == 0)
-                                    first_error_address <= word_address;
-                                if (error_count != 32'hffff_ffff)
-                                    error_count <= error_count + 1'b1;
-                                error_byte_mask <= error_byte_mask | byte_errors(read_difference);
-                            end
+                ST_READ_WAIT: begin
+                    if (avm_readdatavalid) begin
+                        if (read_difference != '0) begin
+                            if (error_count == 0)
+                                first_error_address <= word_address;
+                            if (error_count != 32'hffff_ffff)
+                                error_count <= error_count + 1'b1;
+                            error_byte_mask <= error_byte_mask | byte_errors(read_difference);
+                        end
 
-                            if (word_address == LAST_ADDRESS) begin
-                                word_address <= '0;
-                                if (pattern == PATTERN_COUNT - 1) begin
-                                    pattern <= '0;
-                                    pass_count <= pass_count + 1'b1;
-                                    line_data <= initial_line(2'd0);
-                                end else begin
-                                    pattern <= pattern + 1'b1;
-                                    line_data <= initial_line(pattern + 1'b1);
-                                end
-                                state <= ST_WRITE;
+                        if (word_address == LAST_ADDRESS) begin
+                            word_address <= '0;
+                            if (pattern == PATTERN_COUNT - 1) begin
+                                pattern <= '0;
+                                pass_count <= pass_count + 1'b1;
+                                line_data <= initial_line(2'd0);
                             end else begin
-                                word_address <= word_address + 1'b1;
-                                line_data <= next_line(line_data, pattern);
-                                state <= ST_READ_CMD;
+                                pattern <= pattern + 1'b1;
+                                line_data <= initial_line(pattern + 1'b1);
                             end
+                            state <= ST_WRITE;
+                        end else begin
+                            word_address <= word_address + 1'b1;
+                            line_data <= next_line(line_data, pattern);
+                            state <= ST_READ_CMD;
                         end
                     end
+                end
 
-                    default: state <= ST_IDLE;
-                endcase
-            end
+                default: state <= ST_IDLE;
+            endcase
         end
     end
 

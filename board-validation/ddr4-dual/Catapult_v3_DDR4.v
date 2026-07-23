@@ -58,7 +58,13 @@ wire bot_cal_success;
 wire bot_cal_fail;
 wire bot_pll_locked;
 wire bot_ecc_interrupt;
-wire [2:0] bist_control;
+wire [2:0] bist_source_raw;
+// Quartus 22.1's VHDL altsource_probe implementation rejects an all-zero
+// SOURCE_INITIAL_VALUE for this instance.  Keep its known-good raw value of
+// 3, then invert the two enable bits so the logical BIST control still powers
+// up at 0 (both engines stopped).  System Console applies the inverse mapping
+// on writes; all probe/status consumers see only the logical value.
+wire [2:0] bist_control = bist_source_raw ^ 3'b011;
 
 wire top_bist_running;
 wire [3:0] top_bist_state;
@@ -82,6 +88,33 @@ wire [63:0] bot_bist_error_byte_mask;
 
 wire [31:0] alive_count_gray = alive_count ^ (alive_count >> 1);
 
+// On-die temperature capture.  The System Console conversion is
+// T(C) = 693 * code / 1024 - 265, matching the working PCIe/QSFP designs.
+wire [9:0] temp_raw_wire;
+wire       temp_eoc;
+reg        temp_eoc_meta;
+reg        temp_eoc_sync;
+reg        temp_eoc_prev;
+reg [9:0]  temp_code;
+reg        temp_valid;
+
+altera_temp_sense temp_sensor (
+	.corectl(1'b1),
+	.reset(1'b0),
+	.eoc(temp_eoc),
+	.tempout(temp_raw_wire)
+);
+
+always @(posedge clk_u59) begin
+	temp_eoc_meta <= temp_eoc;
+	temp_eoc_sync <= temp_eoc_meta;
+	temp_eoc_prev <= temp_eoc_sync;
+	if (temp_eoc_prev && !temp_eoc_sync) begin
+		temp_code <= temp_raw_wire;
+		temp_valid <= 1'b1;
+	end
+end
+
 // Probe layout, least-significant field first:
 //   [31:0]    U59 100 MHz Gray counter
 //   [63:32]   bottom EMIF user-clock Gray counter
@@ -97,12 +130,16 @@ wire [31:0] alive_count_gray = alive_count ^ (alive_count >> 1);
 //   [106:104] BIST source/control readback: {clear, bottom enable, top enable}
 //   [291:107] top BIST status
 //   [476:292] bottom BIST status
+//   [477]     on-die temperature valid
+//   [487:478] on-die temperature raw code
 //
 // Each 185-bit BIST status is packed least-significant field first as:
 //   running[0], state[4:1], pattern[6:5], pass Gray[38:7],
 //   error Gray[70:39], address Gray[95:71], first-error address[120:96],
 //   byte-error mask[184:121].
-wire [476:0] ddr4_probe_data = {
+wire [487:0] ddr4_probe_data = {
+	temp_code,
+	temp_valid,
 	bot_bist_error_byte_mask,
 	bot_bist_first_error_address,
 	bot_bist_address_gray,
@@ -149,23 +186,31 @@ begin
 alive_count <= alive_count + 1'b1;
 end
 
+// Leave both BIST engines stopped after configuration.  The raw source starts
+// at 3 and maps to logical control 0.  Memory traffic starts only after System
+// Console verifies calibration, ECC state and temperature.
 altsource_probe #(
 	.sld_auto_instance_index("YES"),
 	.sld_instance_index(0),
 	.instance_id("DDR4"),
-	.probe_width(477),
+	.probe_width(488),
 	.source_width(3),
 	.source_initial_value("3"),
 	.enable_metastability("YES")
 ) ddr4_status_probe (
 	.probe(ddr4_probe_data),
-	.source(bist_control),
+	.source(bist_source_raw),
 	.source_clk(clk_u59),
 	.source_ena(1'b1)
 );
 
 initial begin
 	alive_count = 0;
+	temp_eoc_meta = 1'b0;
+	temp_eoc_sync = 1'b0;
+	temp_eoc_prev = 1'b0;
+	temp_code = 10'd0;
+	temp_valid = 1'b0;
 end
 
 

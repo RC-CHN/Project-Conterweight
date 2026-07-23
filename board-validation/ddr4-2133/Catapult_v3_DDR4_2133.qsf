@@ -1,0 +1,12 @@
+# DDR4-2133 variant.  Board pin assignments stay owned by the accepted
+# DDR4-1600 project; source paths, generated Qsys, safe BIST power-up value and
+# the fitter effort needed for the shorter 2133 user-clock period differ here.
+source ../ddr4-dual/Catapult_v3_DDR4.qsf
+
+# The sourced assignments resolve these local proxy files and the locally
+# generated Qsys.qsys.  Add the base custom-component search path explicitly.
+set_global_assignment -name IP_SEARCH_PATHS ../ddr4-dual/ip/**/*
+set_global_assignment -name VERILOG_FILE ../ddr4-dual/Catapult_v3_DDR4.v
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 16
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+set_global_assignment -name LAST_QUARTUS_VERSION "22.1std.0 Standard Edition"

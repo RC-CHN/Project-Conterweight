@@ -19,3 +19,7 @@
 qsfp-superlite/fpll/
 qsfp-superlite/xcvr_superlite_ii/
 qsfp-superlite/xcvr_reset_controller/
+
+# DDR4-2133 is generated reproducibly from the tracked DDR4-1600 Qsys base
+# and the tracked speed-override Tcl script.
+ddr4-2133/Qsys.qsys

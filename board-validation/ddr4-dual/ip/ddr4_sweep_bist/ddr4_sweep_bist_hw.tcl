@@ -49,6 +49,8 @@ set_interface_property avm burstOnBurstBoundariesOnly false
 set_interface_property avm doStreamReads false
 set_interface_property avm doStreamWrites false
 set_interface_property avm linewrapBursts false
+set_interface_property avm maximumPendingReadTransactions 1
+set_interface_property avm maximumPendingWriteTransactions 0
 set_interface_property avm readLatency 0
 add_interface_port avm avm_address address Output ADDRESS_WIDTH
 add_interface_port avm avm_read read Output 1
@@ -58,7 +60,6 @@ add_interface_port avm avm_readdata readdata Input DATA_WIDTH
 add_interface_port avm avm_waitrequest waitrequest Input 1
 add_interface_port avm avm_readdatavalid readdatavalid Input 1
 add_interface_port avm avm_byteenable byteenable Output BYTE_ENABLE_WIDTH
-add_interface_port avm avm_burstcount burstcount Output 7
 
 add_interface status conduit end
 add_interface_port status running running Output 1

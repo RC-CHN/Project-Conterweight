@@ -11,12 +11,14 @@ set_project_property DEVICE 10AX115N4F40E3SG
 add_instance hip altera_pcie_a10_hip 22.1
 set_instance_parameter_value hip interface_type_hwtcl "Avalon-MM with DMA"
 
-# Hard-IP mode 7 is Gen2 x8 with a 128-bit application interface. This is the
-# PHY mode already proven locally by the PCIe BAR/temperature design; the first
-# Gen3 x8 DMA image compiled and loaded but did not enumerate after reboot.
+# Hard-IP mode 6 is Gen2 x8 with a 256-bit, 125 MHz application interface. It
+# uses the Gen2 PHY class already proven locally by the PCIe BAR/temperature
+# design while keeping the 256-bit width expected by the integrated DMA
+# descriptor tables. The first Gen3 x8 DMA image compiled and loaded but did
+# not enumerate after reboot.
 # Setting the derived width/rate fields directly is ineffective in Quartus
 # 22.1 because wrala_hwtcl rewrites them during validation.
-set_instance_parameter_value hip wrala_hwtcl 7
+set_instance_parameter_value hip wrala_hwtcl 6
 set_instance_parameter_value hip port_type_hwtcl "Native endpoint"
 set_instance_parameter_value hip pcie_spec_version_hwtcl 3.0
 set_instance_parameter_value hip internal_controller_hwtcl 1
@@ -49,7 +51,7 @@ set_instance_parameter_value hip enable_devkit_conduit_hwtcl 0
 set_instance_parameter_value hip select_design_example_hwtcl DMA
 
 # Re-assert the HIP mode last because several parameter callbacks validate it.
-set_instance_parameter_value hip wrala_hwtcl 7
+set_instance_parameter_value hip wrala_hwtcl 6
 
 set resolved_lane_rate [get_instance_parameter_value hip lane_rate_hwtcl]
 set resolved_link_width [get_instance_parameter_value hip link_width_hwtcl]
@@ -60,13 +62,13 @@ if {![string equal $resolved_lane_rate "Gen2 (5.0 Gbps)"]} {
 if {![string equal $resolved_link_width "x8"]} {
     error "HIP link width did not resolve to x8"
 }
-if {![string equal $resolved_interface_width "128-bit"]} {
-    error "HIP application interface did not resolve to 128 bits"
+if {![string equal $resolved_interface_width "256-bit"]} {
+    error "HIP application interface did not resolve to 256 bits"
 }
 
 add_instance dma_buffer altera_avalon_onchip_memory2 22.1
-set_instance_parameter_value dma_buffer dataWidth 128
-set_instance_parameter_value dma_buffer dataWidth2 128
+set_instance_parameter_value dma_buffer dataWidth 256
+set_instance_parameter_value dma_buffer dataWidth2 256
 set_instance_parameter_value dma_buffer deviceFamily "Arria 10"
 set_instance_parameter_value dma_buffer dualPort true
 set_instance_parameter_value dma_buffer ecc_enabled false

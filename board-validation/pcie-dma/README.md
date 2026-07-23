@@ -27,8 +27,10 @@ validated DDR4 controllers.
 
 The first DMA image used Gen3 x8 / 256-bit and compiled, met timing, and loaded
 into SRAM, but it did not enumerate after reboot. The current bring-up image
-uses the Gen2 x8 / 128-bit PHY mode already proven by the BAR/temperature
-design, isolating DMA correctness from the unresolved Gen3 link issue.
+uses a Gen2 x8 / 256-bit, 125 MHz application interface. This keeps the Gen2
+PHY class already proven by the BAR/temperature design and matches the fixed
+256-bit internal DMA descriptor-table ports, isolating DMA correctness from
+the unresolved Gen3 link issue.
 
 Platform Designer uses `10AX115N4F40E3SG` only as the IP catalog's part-trait
 context, matching the already working PCIe prototype. The Quartus QSF remains

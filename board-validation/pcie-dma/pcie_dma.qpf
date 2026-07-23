@@ -1,0 +1,4 @@
+QUARTUS_VERSION = "22.1"
+
+PROJECT_REVISION = "pcie_dma"
+
